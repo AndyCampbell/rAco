@@ -1,0 +1,490 @@
+#Andy Campbell, Marine Inst, Galway
+#15/11/2012 V0.1
+#11/07/2013 V0.2 NWHAS2013 improvements
+#04/07/2014 V0.4 NWHAS2014 improvements
+#10/11/2014 test with CSHAS2013
+
+#BEFORE proceeding...
+#read data from Access DB and export to .RData file using script DataRead32Bit.R
+#create the following files 
+#******_Cruise.dat
+#******_CTD.dat
+#******_Strata.dat
+#******_Transect.dat
+
+#clear memory
+rm(list=ls());
+gc();
+
+#set the working directory if 
+#setwd("C:/Dev/Acoustics/AcoS4")
+
+source("./Scripts/Init.r");
+
+#load Cruise data
+#Cruise <- loadCruise("NWHAS2014")
+#Cruise <- loadCruise("CSHAS2012")
+Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Herring")
+#Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Sprat")
+
+summary(Cruise)
+
+#vessel track
+if (file.exists(paste("./RData/Track_",getName(Cruise),".rda",sep=""))) {
+  load(file=paste("./RData/Track_",getName(Cruise),".rda",sep=""))
+  cat("Track data read in\n")
+}
+
+#CTD data
+CTDs <- loadCTDs(getCode(Cruise),getName(Cruise));
+cat(length(CTDs),"CTDs read in\n");
+
+#Transect data
+Transects <- loadTransects(getCode(Cruise),getName(Cruise));
+cat(length(Transects),"transects read in\n");
+
+#Strata data
+Strata <- loadStrata(getCode(Cruise),getName(Cruise));
+cat(length(Strata),"strata read in\n");
+
+#Species Details (target strength, maturity codes)
+Species <- loadSpeciesDetails(getCode(Cruise));
+cat(length(Species),"species read in\n")
+
+#Mark Yypes
+MarkTypes <- loadMarkTypes(CruiseName = getName(Cruise), SpeciesName = getTargetCommon(Cruise));
+cat(length(MarkTypes),"mark types read in\n")
+
+#Access DB data (already saved in .RData file using 32-bit R)
+#see script DataRead32Bit.R in this project
+#loads initial data for Hauls, Samples, LF, Ags, SA
+load(paste("./Data/",getName(Cruise),"/",getName(Cruise),".RData",sep=""))
+
+#format Haul data
+Hauls <- loadHauls(getCode(Cruise));
+cat(length(Hauls),"hauls read in\n");
+
+#process SA data for the appropriate mark types
+SA <- aggregateSA(SA = SA, MarkTypes = MarkTypes)
+table(unlist(lapply(SA,getMarkType)))
+#source("./Scripts/SA.r");
+
+#create plots directory
+plots.dir<-paste(getwd(),"/Plots/",getName(Cruise),"/",getTargetCommon(Cruise),"/",sep="");
+#create the output directory, suppress the showWarnings so that no warning
+#is issued if the folder already exists
+dir.create(plots.dir,recursive=FALSE,showWarnings=FALSE);
+
+#generate some survey level plots
+source("./Scripts/Plots.r")
+
+#Only proceed past here when strata plots have been examined
+#to check transects and strata bounds
+
+#assign a transect to each registration on the basis of its proximity
+#will be checked against transect assigned previously when data was
+#uploaded to the DB
+SA<-lapply(SA,assignTransect,tran=Transects)
+
+#create QC plots directory
+qcplots.dir<-paste(getwd(),"/QCPlots/",getName(Cruise),"/",getTargetCommon(Cruise),"/",sep="");
+#create the output directory, suppress the showWarnings so that no warning
+#is issued if the folder already exists
+dir.create(qcplots.dir,recursive=TRUE,showWarnings=FALSE);
+
+#loop over marks, report any that are closer to an alternative transect
+#to that stored in the database, generate plot containing transects in question
+#and the location of the mark
+for (i in 1:length(SA)){
+
+  if (SA[[i]]@transect_code!=SA[[i]]@nearest_transect) {
+    
+    #if transects are in the same strata, just plot the strata
+    #with the transects and mark.
+    cat("check mark index",i,"of type",SA[[i]]@marktype_name,"\n")
+    cat("Assigned transect_code",SA[[i]]@transect_code,"in stratum",
+        getStratumCode(Transects[[which(lapply(Transects,getCode)==SA[[i]]@transect_code)]]),
+        "but closer to",SA[[i]]@nearest_transect,"in stratum",
+        getStratumCode(Transects[[which(lapply(Transects,getCode)==SA[[i]]@nearest_transect)]]),"\n")
+    
+    
+    
+    #on transect 
+    on.transect<-which(lapply(Transects,getCode)==SA[[i]]@transect_code)
+    #nearest transect
+    near.transect<-which(lapply(Transects,getCode)==SA[[i]]@nearest_transect)
+    
+    #find the strata to plot from the transects assigned to the mark
+    in.strata<-which(lapply(Strata,getCode)==Transects[[on.transect]]@stratum_code)
+    
+     plot(Cruise,
+          strata=c(Strata[[in.strata]]),
+          transects=c(Transects[[on.transect]],Transects[[near.transect]]),
+          sa=c(SA[[i]]),
+          filename=paste(qcplots.dir,"//SA",as.character(i),".png",sep=""));
+    
+    }
+}
+
+#Check QC plots before proceeding 
+
+
+#length-weight analysis for each species
+#loop over species, setting the LW parameters from a regression analysis
+for (i in seq(length=length(Species))){
+  #LW regression
+  Species[[i]] <- setLW(Species[[i]],LWRegression(getName(Species[[i]])));
+  plot(Species[[i]],
+       filename=paste("./Plots/",getName(Cruise),"/",getTargetCommon(Cruise),"/LW_",Species[[i]]@species,".png",sep=""));
+}
+
+#Create and initialise structures to store the results of the analysis
+#and create the folders
+#subset species to get those to be estimated for abundance
+#est.Species<-Species[lapply(Species,getEstAbd)==TRUE]
+est.Species <- Species[which(unlist(lapply(Species,getTargetCommon))==getTargetCommon(Cruise))]
+
+#results data structure
+out <- vector("list",length(est.Species));
+
+#stratum results
+res.by.stratum <- vector("list",length(Strata));
+names(res.by.stratum) <- unlist(lapply(Strata,getCode));
+
+#transect results
+res.by.transect <- vector("list",length(Transects));
+names(res.by.transect) <- unlist(lapply(Transects,getCode));
+
+#initialise output lists for each species
+for(ii in 1:length(res.by.stratum)){
+  res.by.stratum[[names(res.by.stratum)[ii]]]<-vector("list",length(est.Species))
+}
+for(ii in 1:length(res.by.transect)){
+  res.by.transect[[names(res.by.transect)[ii]]]<-vector("list",length(est.Species))
+}
+
+#create results directory
+results.dir<-paste(getwd(),"/Results/",getName(Cruise),"/",sep="");
+#create the output directory, suppress the showWarnings so that no warning
+#is issued if the folder already exists
+dir.create(results.dir,recursive=FALSE,showWarnings=FALSE);
+
+#loop over species to process - should only be a single species
+for (spe in seq(length=length(est.Species))){
+  
+  #species name
+  spe_name <- getName(est.Species[[spe]]);
+  spe_commonname <- getTargetCommon(est.Species[[spe]]);
+
+  #create results directory for this species
+  spe.dir<-paste(results.dir,spe_commonname,"/",sep="");
+  dir.create(spe.dir,recursive=FALSE,showWarnings=FALSE);
+  
+  #create an object for the results for this species
+  names(out)[spe] <- spe_name;
+
+  #assign species name for each results list
+  for(ii in 1:length(res.by.stratum)){
+    names(res.by.stratum[[names(res.by.stratum)[ii]]])[spe]<-spe_name;
+  }
+  for(ii in 1:length(res.by.transect)){
+    names(res.by.transect[[names(res.by.transect)[ii]]])[spe]<-spe_name;
+  }
+  
+  cat("Processing Species: ",spe_name,"\n",sep="");
+  
+  #create ALK if required
+  if (getEstByAge(est.Species[[spe]])) {
+    
+    #if this is a boarfish calculation, the ALK is stored externally so will need to read it in from 
+    #appropriate file
+
+    if (getCode(Cruise)=='BFAS2013') {
+      
+      #read ALK from file
+      ALK <- read.table("./DATA/BFAS2013/ALK.csv",T,skip=1,row.names=1,sep=",",fill=T)
+      colnames(ALK)<-as.character(seq(1,15))
+      
+    } else {
+      
+      #range of length classes in LF data
+      LF.Range <- range(unlist(lapply(Hauls,getLFRange,species=spe_name)),na.rm=TRUE);
+      
+      #TO DO - find a way to eliminate this loop below
+      ll<-c();
+      aa<-c();
+      
+      for (i in 1:length(Hauls)){
+        la <- getLA(Hauls[[i]],species=spe_name);
+        ll<-c(ll,la$len);
+        aa<-c(aa,la$age);
+      }
+      
+      ALK <- makeKey(len = ll,
+                     len.range = c(floor(range(ll,LF.Range)[1]),ceiling(range(ll,LF.Range)[2])),
+                     len.int = 0.5,
+                     dat = aa,
+                     dat.range = range(aa),
+                     dat.int = 1,
+                     propagate = T);
+      }
+    
+  } else {ALK <- NULL}
+  
+  #create MLK if required
+  if (getEstByMat(est.Species[[spe]])) {
+
+    #if this is a boarfish calculation, the MLK is stored externally so will need to read it in from 
+    #appropriate file
+    
+    if (getCode(Cruise)=='BFAS2013') {
+    
+      #read MLK from file
+      MLK <- read.table("./DATA/BFAS2013/MLK.csv",T,skip=1,row.names=1,sep=",",fill=T)
+      
+      colnames(MLK) <- c("Immature","Mature","Spent")
+      
+    } else {
+      
+      ll<-c();
+      mm<-c();
+      
+      for (i in 1:length(Hauls)){
+        lm <- getLM(Hauls[[i]],species=spe_name);
+        ll<-c(ll,lm$len);
+        mm<-c(mm,lm$mat);
+      }
+      
+      MLK <- makeKey(len = ll,
+                     len.range = c(floor(range(ll,LF.Range)[1]),ceiling(range(ll,LF.Range)[2])),
+                     len.int = 0.5,
+                     dat = mm,
+                     dat.range = range(mm),
+                     dat.int = 1,
+                     propagate = T);
+
+    }
+    
+    #displayKey(MLK);
+
+    #retrieve maturity codes and stages
+    mat_codes <- c(getImmatureCodes(est.Species[[spe]]),
+                   getMatureCodes(est.Species[[spe]]),
+                   getSpentCodes(est.Species[[spe]]));
+
+    names(mat_codes)<-as.character(mat_codes);
+    
+    mat_stages <- list("Immature" = getImmatureCodes(est.Species[[spe]]),
+                       "Mature" = getMatureCodes(est.Species[[spe]]),
+                       "Spent" = getSpentCodes(est.Species[[spe]]));    
+    
+  } else {MLK <- NULL}
+  
+  
+   #subset marktypes to process for this species
+   spe.MarkTypes <- MarkTypes[toupper(lapply(MarkTypes,getSpecies))==toupper(getName(est.Species[[spe]]))] 
+ 
+   #create results directory for all marktypes to be included in the estimate
+   #mt.dir<-paste(spe.dir,"All","/",sep="");
+   #dir.create(mt.dir,recursive=TRUE,showWarnings=FALSE);
+   
+   #loop over the marktypes defined for this species
+   for (mt in seq(length=length(spe.MarkTypes))){
+ 
+    mt_name <- getNASCName(spe.MarkTypes[[mt]]);
+
+    #create results directory for this marktype
+    #mt.dir<-paste(spe.dir,mt_name,"/",sep="");
+    #dir.create(mt.dir,recursive=TRUE,showWarnings=FALSE);
+        
+     #SA data
+     mtSA <- SA[toupper(lapply(SA,getMarkType))==toupper(getNASCName(spe.MarkTypes[[mt]]))];
+     
+     cat("Processing Mark Type: ",getName(spe.MarkTypes[[mt]])," (",getNASCName(spe.MarkTypes[[mt]]),") with ",length(mtSA)," marks\n",sep="");
+     
+     #for each acoustic mark assign the appropriate haul, length frequency and acoustic 
+     #cross section
+     for (i in seq(length=length(mtSA))){
+       
+       #assign the appropriate Haul to each mark
+       mtSA[[i]]<-setHaulCode(mtSA[[i]],assignHaul(spe.MarkTypes[[mt]],pos=getPosition(mtSA[[i]])));
+       
+       #assign the LF to the mark
+       mtSA[[i]]<-setLF(mtSA[[i]],getLFProp(haul.code=getHaulCode(mtSA[[i]]),
+                                            species=getName(est.Species[[spe]]),
+                                            mix.species=getMixedSpecies(spe.MarkTypes[[mt]])))
+       
+       #calculate the acoustic backscatter cross-section
+       mtSA[[i]]<-setCS(mtSA[[i]],Species,spe_name);
+     }
+    
+    #loop over transects, select SA records and calculate transect mean
+    cat("Looping over transects\n")
+    for (tr in lapply(Transects,getCode)){      
+        
+      #transect name
+      tr_name <- getCode(Transects[[tr]]);
+      
+      #marks for current transect
+      #mk<-mtSA[lapply(mtSA,getTransectCode)==getCode(Transects[[tr]])];
+      mk<-mtSA[lapply(mtSA,getTransectCode)==tr];
+
+      if (length(mk)>0){
+
+         #get abundances,biomass for these marks
+         abd<-unlist(lapply(mk,abundance,target=spe_name));
+         bio<-unlist(lapply(mk,biomass,LW=getLW(est.Species[[spe]]),target=spe_name));
+         #and cell length
+         cell<-unlist(lapply(mk,getCellLength));    
+         cells<-unlist(lapply(mk,getCellLengths));
+         
+         mean_abd <- tapply(abd*cells,names(abd),sum)/getTrackLength_nm(Transects[[tr]]);
+         mean_bio <- tapply(bio*cells,names(abd),sum)/getTrackLength_nm(Transects[[tr]]);
+         
+         mn_abd <- as.numeric(mean_abd);
+         names(mn_abd) <- names(mean_abd);
+         mn_bio <- as.numeric(mean_bio);
+         names(mn_bio) <- names(mean_bio);
+         
+         Transects[[tr]]<-setNumMarks(Transects[[tr]],getName(spe.MarkTypes[[mt]]),length(mk));
+         Transects[[tr]]<-setAbdAtLen(Transects[[tr]],getName(spe.MarkTypes[[mt]]),mn_abd);
+         Transects[[tr]]<-setBioAtLen(Transects[[tr]],getName(spe.MarkTypes[[mt]]),mn_bio);
+         
+          if (!is.null(ALK)){
+            Transects[[tr]]<-setAbdAtAge(Transects[[tr]],getName(spe.MarkTypes[[mt]]),applyKey(mn_abd[mn_bio>0],ALK));
+            Transects[[tr]]<-setBioAtAge(Transects[[tr]],getName(spe.MarkTypes[[mt]]),applyKey(mn_bio[mn_bio>0],ALK));
+          }
+          if (!is.null(MLK)){
+            Transects[[tr]]<-setAbdAtMat(Transects[[tr]],getName(spe.MarkTypes[[mt]]),applyKey(mn_abd[mn_abd>0],MLK));
+            Transects[[tr]]<-setBioAtMat(Transects[[tr]],getName(spe.MarkTypes[[mt]]),applyKey(mn_bio[mn_bio>0],MLK));
+          }
+      }
+      
+    }#end loop over transects
+
+    
+    #Loop over strata, select the appropriate transects and calculate the stratum 
+    #results
+    cat("Looping over strats\n")
+    for (i in seq(length=length(Strata))){
+      
+      #stratum name
+      str_name <- getCode(Strata[[i]]);
+      
+      #retrieve list of transects in this stratum
+      tr <- Transects[lapply(Transects,getStratumCode)==str_name];
+      
+      if (length(tr)>0) {
+
+        #mean abundances/biomass by transect
+        labd<-lapply(tr,getMeanAbundance,marktype=getName(spe.MarkTypes[[mt]]))
+        lbio<-lapply(tr,getMeanBiomass,marktype=getName(spe.MarkTypes[[mt]]))
+        #variances
+        vabd<-var(as.vector(unlist(labd)))
+        vbio<-var(as.vector(unlist(lbio)))
+
+        #weighting for variances
+        #track lengths
+        llen<-as.vector(unlist(lapply(tr,getTrackLength_nm)))
+        wVar <- sum(llen^2)/sum(llen)^2         
+                
+        #calculate mean abundance for the stratum
+        #this is already done in the setAbdByLen method - but just want to compare
+        new_abd <- sum(as.vector(unlist(labd))*as.vector(unlist(llen)))/sum(as.vector(unlist(llen)))     
+        new_bio <- sum(as.vector(unlist(lbio))*as.vector(unlist(llen)))/sum(as.vector(unlist(llen)))     
+        
+        
+        #record number of transects
+        #res.by.stratum[[str_name]][[spe_name]][[mt_name]][["Num Transects"]]<-length(tr);        
+        
+        #get abundances,biomass for these transects
+        #abd<-unlist(lapply(tr,getAbdAtLen,name=getName(spe.MarkTypes[[mt]])));
+        #bio<-unlist(lapply(tr,getBioAtLen,name=getName(spe.MarkTypes[[mt]])));
+        #abd<-lapply(tr,getAbdAtLen,name=getName(spe.MarkTypes[[mt]]));
+        abd<-lapply(tr,getAbdAtLen,marktypes=getName(spe.MarkTypes[[mt]]));
+        #bio<-lapply(tr,getBioAtLen,name=getName(spe.MarkTypes[[mt]]));
+        bio<-lapply(tr,getBioAtLen,marktypes=getName(spe.MarkTypes[[mt]]));
+        
+        if (sum(unlist(abd))>0) {
+
+           #and cell lengths
+           #cells<-unlist(lapply(tr,getCellLengths,name=getName(spe.MarkTypes[[mt]])));
+           cells<-lapply(tr,getCellLengths,name=getName(spe.MarkTypes[[mt]]));
+           
+           #combine the abundances to stratum level
+           #multiply by cell length
+           for(j in 1:length(abd)){
+             abd[[j]]<-abd[[j]]*cells[[j]]
+             bio[[j]]<-bio[[j]]*cells[[j]]
+           }
+           
+           #unique length classes sorted
+           lc<-sort(unique(as.numeric(unlist(lapply(abd,names)))))
+           #vector to hold summed abundances
+           sum.abd<-vector("numeric",length=length(lc))
+           sum.bio<-vector("numeric",length=length(lc))
+           names(sum.abd)<-lc
+           names(sum.bio)<-lc
+           for (j in 1:length(lc)){
+             sum.abd[as.character(lc[j])]<-sum(unlist(lapply(abd,'[',as.character(lc[j]))),na.rm=TRUE)
+             sum.bio[as.character(lc[j])]<-sum(unlist(lapply(bio,'[',as.character(lc[j]))),na.rm=TRUE)
+           }
+
+           mean_abd <- sum.abd/getTrackLength_nm(Strata[[i]]);
+           mean_bio <- sum.bio/getTrackLength_nm(Strata[[i]]);
+
+           Strata[[str_name]]<-setAbdAtLen(Strata[[str_name]],getName(spe.MarkTypes[[mt]]),mean_abd[mean_abd>0]);
+           Strata[[str_name]]<-setBioAtLen(Strata[[str_name]],getName(spe.MarkTypes[[mt]]),mean_bio[mean_bio>0]);
+           
+           if (!is.null(ALK)) {
+             Strata[[str_name]]<-setAbdAtAge(Strata[[str_name]],getName(spe.MarkTypes[[mt]]),applyKey(mean_abd[mean_abd>0],ALK));
+             Strata[[str_name]]<-setBioAtAge(Strata[[str_name]],getName(spe.MarkTypes[[mt]]),applyKey(mean_bio[mean_bio>0],ALK));
+           }
+
+           if (!is.null(MLK)) {
+             Strata[[str_name]]<-setAbdAtMat(Strata[[str_name]],getName(spe.MarkTypes[[mt]]),applyKey(mean_abd[mean_abd>0],MLK));       
+             Strata[[str_name]]<-setBioAtMat(Strata[[str_name]],getName(spe.MarkTypes[[mt]]),applyKey(mean_bio[mean_bio>0],MLK));          
+          }
+          
+        } #end sum(abd)>0 condition
+      } #end length(tr)>0 condition
+    } #end loop over strata    
+
+#     #calculate survey totals
+#     Survey.abun <- c();
+#     Survey.bio <- c();
+#     
+#     for (i in 1:length(Strata)){
+#       Survey.abun <- c(Survey.abun,getArea(Strata[[i]])*getAbdAtLen(Strata[[i]]));
+#       Survey.bio <- c(Survey.bio,getArea(Strata[[i]])*getBioAtLen(Strata[[i]]));
+#     }
+#     
+#     #remove zeros
+#     Survey.abun <- Survey.abun[Survey.abun>0];
+#     Survey.bio <- Survey.bio[Survey.bio>0];
+#     
+#     #group by length
+#     Survey.abun <- tapply(Survey.abun,names(Survey.abun),sum);
+#     Survey.bio <- tapply(Survey.bio,names(Survey.bio),sum);
+#     
+#     #totals
+#     sum(Survey.abun);
+#     sum(Survey.bio);    
+#     
+#     cat("Abun=",max(sum(Survey.abun),0),"\n");
+   
+  }#end loop over marktypes
+
+
+  #calculate variances
+  cat("Calculating variances\n")
+  source("./Scripts/Variances.r");
+
+  #save species results
+
+  save(list=c("Cruise","Transects","Strata","spe.MarkTypes","MarkTypes","Species","ALK","MLK","CVatAge","CVAbdSur","CVBioSur","Hauls","Samples"),
+       file=paste(spe.dir,spe_commonname,".RData",sep=""))
+
+}#end loop species
+
+
