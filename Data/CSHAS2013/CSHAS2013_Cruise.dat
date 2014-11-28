@@ -1,0 +1,42 @@
+Acoustic Survey Cruise Details
+Cruise Code::CE13015
+Cruise Name::CSHAS2013
+Desc::Celtic Sea Herring Acoustic Survey, 2013
+Vessel::Celtic Explorer
+Start Date::2012-10-07 00:00:01
+End Date::2012-10-27 23:59:59
+Target Species Common::Herring
+Target Species Scientific::Clupea Herrangus
+
+Mark Type::Definitely Herring
+NASC Name::Def Herring
+Species Common::Herring
+Species Scientific::Clupea Herrangus
+Include::True
+Haul Assignment Type::Nearest
+Hauls::12,16,17,18,20
+
+Mark Type::Probably Herring
+NASC Name::Probably Herring
+Species Common::Herring
+Species Scientific::Clupea Herrangus
+Include::True
+Haul Assignment Type::Nearest
+Hauls::12,16,17,18,20
+
+Mark Type::Herring In A Mix
+NASC Name::Herring In A Mix
+Species Common::Herring
+Species Scientific::Clupea Herrangus
+Include::True
+Haul Assignment Type::Nearest
+Mixed::Scomber Scombrus,Sprattus Sprattus
+Hauls::12,16,17,18,20
+
+Mark Type::Possibly Herring
+NASC Name::Possibly Herring
+Species Common::Herring
+Species Scientific::Clupea Herrangus
+Include::True
+Haul Assignment Type::Nearest
+Hauls::12,16,17,18,20
