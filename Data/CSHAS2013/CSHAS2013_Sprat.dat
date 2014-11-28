@@ -1,0 +1,34 @@
+Acoustic Survey Cruise Details
+Cruise Code::CE13015
+Cruise Name::CSHAS2013
+Desc::Celtic Sea Herring Acoustic Survey, 2013
+Vessel::Celtic Explorer
+Start Date::2012-10-07 00:00:01
+End Date::2012-10-27 23:59:59
+Target Species Common::Sprat
+Target Species Scientific::Sprattus Sprattus
+
+Mark Type::Definitely Sprat
+NASC Name::Def Sprat
+Species Common::Sprat
+Species Scientific::Sprattus Sprattus
+Include::True
+Haul Assignment Type::Nearest
+Hauls::2,3,8,9,10,11,13,15,20
+
+Mark Type::Probably Sprat
+NASC Name::Probably Sprat
+Species Common::Sprat
+Species Scientific::Sprattus Sprattus
+Include::True
+Haul Assignment Type::Nearest
+Hauls::2,3,8,9,10,11,13,15,20
+
+Mark Type::Sprat In A Mix
+NASC Name::Sprat In A Mix
+Species Common::Sprat
+Species Scientific::Sprattus Sprattus
+Include::True
+Haul Assignment Type::Nearest
+Mixed::Clupea Herrangus,Trachurus Trachurus,Scomber Scombrus,Sardina Pilchardus
+Hauls::2,3,8,9,10,11,13,15,20
