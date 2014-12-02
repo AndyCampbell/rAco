@@ -541,8 +541,12 @@ loadHauls <- function(CruiseCode) {
       tmp <- haul(code=as.character(Hauls$HaulNo[h]),
                   cruise_code = CruiseCode,
                   valid = Hauls$Valid[h],
-                  shoot_wp = waypoint(Hauls$ShotLat[h],Hauls$ShotLon[h],as.POSIXlt(strptime(Hauls$ShotDateTime[h],"%d/%m/%Y %H:%M"))),
-                  haul_wp = waypoint(Hauls$HaulLat[h],Hauls$HaulLon[h],as.POSIXlt(strptime(Hauls$HaulDateTime[h],"%d/%m/%Y %H:%M"))),
+                  shoot_wp = waypoint(lat=Hauls$ShotLat[h],
+                                      lon=Hauls$ShotLon[h],
+                                      time=as.POSIXlt(strptime(Hauls$ShotDateTime[h],"%d/%m/%Y %H:%M"))),
+                  haul_wp = waypoint(lat=Hauls$HaulLat[h],
+                                     lon=Hauls$HaulLon[h],
+                                     time=as.POSIXlt(strptime(Hauls$HaulDateTime[h],"%d/%m/%Y %H:%M"))),
                   species = spe)
       
       ret<-c(ret,tmp)
