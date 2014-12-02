@@ -73,7 +73,7 @@ table(unlist(lapply(SA,getMarkType)))
 plots.dir<-paste(getwd(),"/Plots/",getName(Cruise),"/",getTargetCommon(Cruise),"/",sep="");
 #create the output directory, suppress the showWarnings so that no warning
 #is issued if the folder already exists
-dir.create(plots.dir,recursive=FALSE,showWarnings=FALSE);
+dir.create(plots.dir,recursive=TRUE,showWarnings=FALSE);
 
 #generate some survey level plots
 source("./Scripts/Plots.r")
@@ -167,7 +167,7 @@ for(ii in 1:length(res.by.transect)){
 results.dir<-paste(getwd(),"/Results/",getName(Cruise),"/",sep="");
 #create the output directory, suppress the showWarnings so that no warning
 #is issued if the folder already exists
-dir.create(results.dir,recursive=FALSE,showWarnings=FALSE);
+dir.create(results.dir,recursive=TRUE,showWarnings=FALSE);
 
 #loop over species to process - should only be a single species
 for (spe in seq(length=length(est.Species))){
@@ -178,6 +178,7 @@ for (spe in seq(length=length(est.Species))){
 
   #create results directory for this species
   spe.dir<-paste(results.dir,spe_commonname,"/",sep="");
+  #this call doesn't need recursive=TRUE as the parent directory should already exist
   dir.create(spe.dir,recursive=FALSE,showWarnings=FALSE);
   
   #create an object for the results for this species
