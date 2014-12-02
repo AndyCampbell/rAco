@@ -14,7 +14,7 @@ load(paste("./Results/",cruiseName,"/",species,"/",species,".RData",sep=""))
 
 #create a directory in which to save the tabular output
 tables.dir<-paste(getwd(),"/Tables/",getName(Cruise),"/",sep="");
-dir.create(tables.dir,recursive=FALSE,showWarnings=FALSE);
+dir.create(tables.dir,recursive=TRUE,showWarnings=FALSE);
 tables.dir<-paste(tables.dir,species,"/",sep="");
 dir.create(tables.dir,recursive=FALSE,showWarnings=FALSE);
 
