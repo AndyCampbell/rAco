@@ -3,33 +3,33 @@
 #11/07/2013 V0.2 NWHAS2013 improvements
 #04/07/2014 V0.4 NWHAS2014 improvements
 #10/11/2014 test with CSHAS2013
+#12/02/2014 moved into github
 
 #BEFORE proceeding...
-#read data from Access DB and export to .RData file using script DataRead32Bit.R
-#create the following files 
+#ensure the following files are available (in repository)
+#******.RData (created using DB2RData.r)
 #******_Cruise.dat
-#******_CTD.dat
-#******_Strata.dat
-#******_Transect.dat
+#******_CTD.csv
+#******_Strata.csv
+#******_Transect.csv
+#******_Species.dat
 
 #clear memory
 rm(list=ls());
 gc();
 
-#set the working directory if 
-#setwd("C:/Dev/Acoustics/AcoS4")
-
+#load in libraries, function definitions, plotting data
 source("./Scripts/Init.r");
 
-#load Cruise data
-#Cruise <- loadCruise("NWHAS2014")
-#Cruise <- loadCruise("CSHAS2012")
+
+#load Cruise data file
 Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Sprat")
 
+#print cruise summary to the screen
 summary(Cruise)
 
-#vessel track
+#load vessel track if it's available
 if (file.exists(paste("./RData/Track_",getName(Cruise),".rda",sep=""))) {
   load(file=paste("./RData/Track_",getName(Cruise),".rda",sep=""))
   cat("Track data read in\n")
@@ -56,7 +56,7 @@ MarkTypes <- loadMarkTypes(CruiseName = getName(Cruise), SpeciesName = getTarget
 cat(length(MarkTypes),"mark types read in\n")
 
 #Access DB data (already saved in .RData file using 32-bit R)
-#see script DataRead32Bit.R in this project
+#see script DB2RData.r in this project
 #loads initial data for Hauls, Samples, LF, Ags, SA
 load(paste("./Data/",getName(Cruise),"/",getName(Cruise),".RData",sep=""))
 
