@@ -7,18 +7,18 @@ gc();
 source("./Scripts/Init.r");
 
 cruiseName <- getName(Cruise)
-species <- getTargetCommon(Cruise)
+Estspecies <- getTargetCommon(Cruise)
 
 #load in the processed data
-load(paste("./Results/",cruiseName,"/",species,"/",species,".RData",sep=""))
+load(paste("./Results/",cruiseName,"/",Estspecies,"/",Estspecies,".RData",sep=""))
 
 #create a directory in which to save the tabular output
 tables.dir<-paste(getwd(),"/Tables/",getName(Cruise),"/",sep="");
 dir.create(tables.dir,recursive=TRUE,showWarnings=FALSE);
-tables.dir<-paste(tables.dir,species,"/",sep="");
+tables.dir<-paste(tables.dir,Estspecies,"/",sep="");
 dir.create(tables.dir,recursive=FALSE,showWarnings=FALSE);
 
-#the following are generated
+#the following are generated (not in all cases)
 
 #Biomass at age by strata and ICES division (table1)
 #Abundance at age by strata and ICES division (table2)
@@ -37,13 +37,6 @@ rep.Ages <- as.numeric(colnames(ALK))
 rep.MTs <- names(lapply(spe.MarkTypes,getIncludeInEstimates))[unlist(lapply(spe.MarkTypes,getIncludeInEstimates))]
 
 #table headers
-# headers<-c(paste("Strata",paste(rep.Ages,collapse=","),"Total",sep=","),
-#            paste("Strata",paste(rep.Ages,collapse=","),"Total",sep=","),
-#            paste("Strata","Immature","Mature","Spent","Total",sep=","),
-#            paste("Strata","Immature","Mature","Spent","Total",sep=","),
-#            paste("Strata","No.","No.","Def","Mix","Prob.","%","Def.","Mix","Prob.","Biomass","SSB","Abund",sep=","),
-#            paste("","Tran","Sch","Sch","Sch","Sch","zeros","Bio.","Bio.","Bio.","(000's t)","(000's t)","(mills.)",sep=","))
-
 headers<-c(paste("Strata",paste(rep.Ages,collapse=","),"Total",sep=","),
            paste("Strata",paste(rep.Ages,collapse=","),"Total",sep=","),
            paste("Strata","Immature","Mature","Spent","Total",sep=","),
@@ -51,223 +44,237 @@ headers<-c(paste("Strata",paste(rep.Ages,collapse=","),"Total",sep=","),
            paste("Stratum","No Tran","No Sch","Def Sch","Mix Sch","Prob Sch","% Zeros","Def Bio","Mix Bio","Prob Bio","Biomass (000's t)","SSB (000's t)","Abund (mills)",sep=","),
            paste("No.","Date","Time","Lat","Lon","Target Depth (m)","Bottom Depth (m)","Bulk Catch (kg)","Sampled Catch (kg)",sep=","),
            paste("Length (cm)","Age 0","(rings) 1","2","3","4","5","6","7","8","9","10","Abund. (mills)","Biomass (kt)","Mn Wgt (g)",sep=","))
-           
+
 
 #Abundance at age by strata Report
+#only for aged species
 #----------------------------------------------------------------------
 
-AbdAtAge <- lapply(Strata,getAbdAtAge,marktypes=rep.MTs)
-#total
-AbdAtAge[['Total']] <- Reduce("+",Filter(Negate(is.null),AbdAtAge))
-#percentages
-AbdAtAge[['%']] <- 100.0*AbdAtAge[['Total']]/sum(AbdAtAge[['Total']])
-#CVs
-AbdAtAge[['CV']] <- CVatAge
+if (getEstByAge(Species[[Estspecies]])) {
 
-if (substring(cruiseName,1,4)=="BFAS") {
-  #Boarfish summaries
-  cat(" \n")
-} else if (substring(cruiseName,1,5)=="NWHAS") {
-  #North West Herring summaries  
-  #VIaN only
-  VIaN <- Strata[lapply(Strata,getICESarea)=="VIaN"]
-  VIaN.AbdAtAge <- lapply(VIaN,getAbdAtAge,marktypes=rep.MTs)
-  AbdAtAge[['VIaN']] <- Reduce("+",Filter(Negate(is.null),VIaN.AbdAtAge))
-  #VIaS only
-  VIaS <- Strata[lapply(Strata,getICESarea)=="VIaS"]
-  VIaS.AbdAtAge <- lapply(VIaS,getAbdAtAge,marktypes=rep.MTs)
-  AbdAtAge[['VIaS']] <- Reduce("+",Filter(Negate(is.null),VIaS.AbdAtAge))
-  #VIIb only
-  VIIb <- Strata[lapply(Strata,getICESarea)=="VIIb"]
-  VIIb.AbdAtAge <- lapply(VIIb,getAbdAtAge,marktypes=rep.MTs)
-  AbdAtAge[['VIIb']] <- Reduce("+",Filter(Negate(is.null),VIIb.AbdAtAge))
-} else if (substring(cruiseName,1,5)=="CSHAS") {
-  #Celtic Sea Herring summaries
-  cat("\n")
+  AbdAtAge <- lapply(Strata,getAbdAtAge,marktypes=rep.MTs)
+  #total
+  AbdAtAge[['Total']] <- Reduce("+",Filter(Negate(is.null),AbdAtAge))
+  #percentages
+  AbdAtAge[['%']] <- 100.0*AbdAtAge[['Total']]/sum(AbdAtAge[['Total']])
+  #CVs
+  AbdAtAge[['CV']] <- CVatAge
+  
+  if (substring(cruiseName,1,4)=="BFAS") {
+    #Boarfish summaries
+    cat(" \n")
+  } else if (substring(cruiseName,1,5)=="NWHAS") {
+    if (Estspecies=='Herring') {
+      #North West Herring summaries  
+      #VIaN only
+      VIaN <- Strata[lapply(Strata,getICESarea)=="VIaN"]
+      VIaN.AbdAtAge <- lapply(VIaN,getAbdAtAge,marktypes=rep.MTs)
+      AbdAtAge[['VIaN']] <- Reduce("+",Filter(Negate(is.null),VIaN.AbdAtAge))
+      #VIaS only
+      VIaS <- Strata[lapply(Strata,getICESarea)=="VIaS"]
+      VIaS.AbdAtAge <- lapply(VIaS,getAbdAtAge,marktypes=rep.MTs)
+      AbdAtAge[['VIaS']] <- Reduce("+",Filter(Negate(is.null),VIaS.AbdAtAge))
+      #VIIb only
+      VIIb <- Strata[lapply(Strata,getICESarea)=="VIIb"]
+      VIIb.AbdAtAge <- lapply(VIIb,getAbdAtAge,marktypes=rep.MTs)
+      AbdAtAge[['VIIb']] <- Reduce("+",Filter(Negate(is.null),VIIb.AbdAtAge))
+    }
+  } else if (substring(cruiseName,1,5)=="CSHAS") {
+    #Celtic Sea Herring summaries
+    cat("\n")
+  }
+  
+  op<-lapply(AbdAtAge,formatOPLine,ages=rep.Ages,numfmt="%.2f")
+  #the total column for the CV should be the CV assocated with the survey abundance (CVAbdSur)
+  op[['CV']]<-sub(rev(unlist(strsplit(op[['CV']],",")))[1],CVAbdSur,op[['CV']])
+  
+  #add name to start of list
+  for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
+  #write header
+  writeOPLine(headers[1],file=paste(tables.dir,"AbdAtAge.csv",sep=""),append=FALSE)
+  #write details
+  lapply(op,writeOPLine,file=paste(tables.dir,"AbdAtAge.csv",sep=""))
+
 }
-
-op<-lapply(AbdAtAge,formatOPLine,ages=rep.Ages,numfmt="%.2f")
-#the total column for the CV should be the CV assocated with the survey abundance (CVAbdSur)
-op[['CV']]<-sub(rev(unlist(strsplit(op[['CV']],",")))[1],CVAbdSur,op[['CV']])
-
-#add name to start of list
-for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
-#write header
-writeOPLine(headers[1],file=paste(tables.dir,"AbdAtAge.csv",sep=""),append=FALSE)
-#write details
-lapply(op,writeOPLine,file=paste(tables.dir,"AbdAtAge.csv",sep=""))
-
 
 
 #Biomass at age by strata report
 #----------------------------------------------------------------------------
-BioAtAge <- lapply(Strata,getBioAtAge,marktypes=rep.MTs)
-#total
-BioAtAge[['Total']] <- Reduce("+",Filter(Negate(is.null),BioAtAge))
-#percentages
-BioAtAge[['%']] <- 100.0*BioAtAge[['Total']]/sum(BioAtAge[['Total']])
+if (getEstByAge(Species[[Estspecies]])) {
+  
+  BioAtAge <- lapply(Strata,getBioAtAge,marktypes=rep.MTs)
+  #total
+  BioAtAge[['Total']] <- Reduce("+",Filter(Negate(is.null),BioAtAge))
+  #percentages
+  BioAtAge[['%']] <- 100.0*BioAtAge[['Total']]/sum(BioAtAge[['Total']])
+  
+  if (substring(cruiseName,1,4)=="BFAS") {
+    #Boarfish summaries
+    cat(" \n")
+  } else if (substring(cruiseName,1,5)=="NWHAS") {
+    #North West Herring
+    #VIaN only
+    VIaN <- Strata[lapply(Strata,getICESarea)=="VIaN"]
+    VIaN.BioAtAge <- lapply(VIaN,getBioAtAge,marktypes=rep.MTs)
+    BioAtAge[['VIaN']] <- Reduce("+",Filter(Negate(is.null),VIaN.BioAtAge))
+    #VIaS only
+    VIaS <- Strata[lapply(Strata,getICESarea)=="VIaS"]
+    VIaS.BioAtAge <- lapply(VIaS,getBioAtAge,marktypes=rep.MTs)
+    BioAtAge[['VIaS']] <- Reduce("+",Filter(Negate(is.null),VIaS.BioAtAge))
+    #VIIb only
+    VIIb <- Strata[lapply(Strata,getICESarea)=="VIIb"]
+    VIIb.BioAtAge <- lapply(VIIb,getBioAtAge,marktypes=rep.MTs)
+    BioAtAge[['VIIb']] <- Reduce("+",Filter(Negate(is.null),VIIb.BioAtAge))
+  } else if (substring(cruiseName,1,5)=="CSHAS"){
+    #Celtic Sea Herring
+    cat("\n")
+  }
+  
+  op<-lapply(BioAtAge,formatOPLine,ages=rep.Ages,numfmt="%.1f")
+  #add name to start of list
+  for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
+  #write header
+  writeOPLine(headers[2],file=paste(tables.dir,"BioAtAge.csv",sep=""),append=FALSE)
+  #write details
+  lapply(op,writeOPLine,file=paste(tables.dir,"BioAtAge.csv",sep=""))
 
-if (substring(cruiseName,1,4)=="BFAS") {
-  #Boarfish summaries
-  cat(" \n")
-} else if (substring(cruiseName,1,5)=="NWHAS") {
-  #North West Herring
-  #VIaN only
-  VIaN <- Strata[lapply(Strata,getICESarea)=="VIaN"]
-  VIaN.BioAtAge <- lapply(VIaN,getBioAtAge,marktypes=rep.MTs)
-  BioAtAge[['VIaN']] <- Reduce("+",Filter(Negate(is.null),VIaN.BioAtAge))
-  #VIaS only
-  VIaS <- Strata[lapply(Strata,getICESarea)=="VIaS"]
-  VIaS.BioAtAge <- lapply(VIaS,getBioAtAge,marktypes=rep.MTs)
-  BioAtAge[['VIaS']] <- Reduce("+",Filter(Negate(is.null),VIaS.BioAtAge))
-  #VIIb only
-  VIIb <- Strata[lapply(Strata,getICESarea)=="VIIb"]
-  VIIb.BioAtAge <- lapply(VIIb,getBioAtAge,marktypes=rep.MTs)
-  BioAtAge[['VIIb']] <- Reduce("+",Filter(Negate(is.null),VIIb.BioAtAge))
-} else if (substring(cruiseName,1,5)=="CSHAS"){
-  #Celtic Sea Herring
-  cat("\n")
 }
-
-op<-lapply(BioAtAge,formatOPLine,ages=rep.Ages,numfmt="%.1f")
-#add name to start of list
-for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
-#write header
-writeOPLine(headers[2],file=paste(tables.dir,"BioAtAge.csv",sep=""),append=FALSE)
-#write details
-lapply(op,writeOPLine,file=paste(tables.dir,"BioAtAge.csv",sep=""))
-
 
 #Abundance at maturity by strata Report
 #----------------------------------------------------------------------
 
-#no groups specified for boarfish as maturity key was input separately
-if (substring(cruiseName,1,4)=="BFAS") {
-
-  AbdAtMat <- lapply(Strata,getAbdAtMat,marktypes=rep.MTs)
-
-  #total
-  AbdAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),AbdAtMat))
-  #percentages
-  AbdAtMat[['%']] <- 100.0*AbdAtMat[['Total']]/sum(AbdAtMat[['Total']])
+if (getEstByMat(Species[[Estspecies]])) {
   
-} else if (substring(cruiseName,1,5)=="NWHAS") {
-  #North West Herring
+  #no groups specified for boarfish as maturity key was input separately
+  if (substring(cruiseName,1,4)=="BFAS") {
   
-  #TO DO - remove hardcoded species name
-  AbdAtMat <- lapply(Strata,getAbdAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[['Herring']]),
-                                                                         "Mature"=getMatureCodes(Species[['Herring']]),
-                                                                         "Spent"=getSpentCodes(Species[['Herring']])))
-  #total
-  AbdAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),AbdAtMat))
-  #percentages
-  AbdAtMat[['%']] <- 100.0*AbdAtMat[['Total']]/sum(AbdAtMat[['Total']])
+    AbdAtMat <- lapply(Strata,getAbdAtMat,marktypes=rep.MTs)
+  
+    #total
+    AbdAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),AbdAtMat))
+    #percentages
+    AbdAtMat[['%']] <- 100.0*AbdAtMat[['Total']]/sum(AbdAtMat[['Total']])
+    
+  } else if (substring(cruiseName,1,5)=="NWHAS") {
+    #North West Herring
+    
+    AbdAtMat <- lapply(Strata,getAbdAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+                                                                           "Mature"=getMatureCodes(Species[[Estspecies]]),
+                                                                           "Spent"=getSpentCodes(Species[[Estspecies]])))
+    #total
+    AbdAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),AbdAtMat))
+    #percentages
+    AbdAtMat[['%']] <- 100.0*AbdAtMat[['Total']]/sum(AbdAtMat[['Total']])
+  
+    #VIaN only
+    VIaN <- Strata[lapply(Strata,getICESarea)=="VIaN"]
+    VIaN.AbdAtMat <- lapply(VIaN,getAbdAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+                                                                              "Mature"=getMatureCodes(Species[[Estspecies]]),
+                                                                              "Spent"=getSpentCodes(Species[[Estspecies]])))
+    AbdAtMat[['VIaN']] <- Reduce("+",Filter(Negate(is.null),VIaN.AbdAtMat))
+    #VIaS only
+    VIaS <- Strata[lapply(Strata,getICESarea)=="VIaS"]
+    VIaS.AbdAtMat <- lapply(VIaS,getAbdAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+                                                                              "Mature"=getMatureCodes(Species[[Estspecies]]),
+                                                                              "Spent"=getSpentCodes(Species[[Estspecies]])))
+    AbdAtMat[['VIaS']] <- Reduce("+",Filter(Negate(is.null),VIaS.AbdAtMat))
+    #VIIb only
+    VIIb <- Strata[lapply(Strata,getICESarea)=="VIIb"]
+    VIIb.AbdAtMat <- lapply(VIIb,getAbdAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+                                                                              "Mature"=getMatureCodes(Species[[Estspecies]]),
+                                                                              "Spent"=getSpentCodes(Species[[Estspecies]])))
+    AbdAtMat[['VIIb']] <- Reduce("+",Filter(Negate(is.null),VIIb.AbdAtMat))
+    
+  } else if (substring(cruiseName,1,5)=="CSHAS"){
+    #Celtic Sea Herring  
+    AbdAtMat <- lapply(Strata,getAbdAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+                                                                           "Mature"=getMatureCodes(Species[[Estspecies]]),
+                                                                           "Spent"=getSpentCodes(Species[[Estspecies]])))
+    #total
+    AbdAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),AbdAtMat))
+    #percentages
+    AbdAtMat[['%']] <- 100.0*AbdAtMat[['Total']]/sum(AbdAtMat[['Total']])
+    
+  }
+  
+  op<-lapply(AbdAtMat,formatOPLine,ages=c("Immature","Mature","Spent"),numfmt="%.2f")
+  #add name to start of list
+  for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
+  #write header
+  writeOPLine(headers[3],file=paste(tables.dir,"AbdAtMat.csv",sep=""),append=FALSE)
+  #write details
+  lapply(op,writeOPLine,file=paste(tables.dir,"AbdAtMat.csv",sep=""))
 
-  #VIaN only
-  VIaN <- Strata[lapply(Strata,getICESarea)=="VIaN"]
-  VIaN.AbdAtMat <- lapply(VIaN,getAbdAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[species]]),
-                                                                            "Mature"=getMatureCodes(Species[[species]]),
-                                                                            "Spent"=getSpentCodes(Species[[species]])))
-  AbdAtMat[['VIaN']] <- Reduce("+",Filter(Negate(is.null),VIaN.AbdAtMat))
-  #VIaS only
-  VIaS <- Strata[lapply(Strata,getICESarea)=="VIaS"]
-  VIaS.AbdAtMat <- lapply(VIaS,getAbdAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[species]]),
-                                                                            "Mature"=getMatureCodes(Species[[species]]),
-                                                                            "Spent"=getSpentCodes(Species[[species]])))
-  AbdAtMat[['VIaS']] <- Reduce("+",Filter(Negate(is.null),VIaS.AbdAtMat))
-  #VIIb only
-  VIIb <- Strata[lapply(Strata,getICESarea)=="VIIb"]
-  VIIb.AbdAtMat <- lapply(VIIb,getAbdAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[species]]),
-                                                                            "Mature"=getMatureCodes(Species[[species]]),
-                                                                            "Spent"=getSpentCodes(Species[[species]])))
-  AbdAtMat[['VIIb']] <- Reduce("+",Filter(Negate(is.null),VIIb.AbdAtMat))
-  
-} else if (substring(cruiseName,1,5)=="CSHAS"){
-  #Celtic Sea Herring
-
-  #TO DO - remove hardcoded species name
-  AbdAtMat <- lapply(Strata,getAbdAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[species]]),
-                                                                         "Mature"=getMatureCodes(Species[[species]]),
-                                                                         "Spent"=getSpentCodes(Species[[species]])))
-  #total
-  AbdAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),AbdAtMat))
-  #percentages
-  AbdAtMat[['%']] <- 100.0*AbdAtMat[['Total']]/sum(AbdAtMat[['Total']])
-  
 }
-
-op<-lapply(AbdAtMat,formatOPLine,ages=c("Immature","Mature","Spent"),numfmt="%.2f")
-#add name to start of list
-for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
-#write header
-writeOPLine(headers[3],file=paste(tables.dir,"AbdAtMat.csv",sep=""),append=FALSE)
-#write details
-lapply(op,writeOPLine,file=paste(tables.dir,"AbdAtMat.csv",sep=""))
 
 
 #Biomass at maturity by strata Report
 #----------------------------------------------------------------------
 
-#no groups specified for boarfish as maturity key was input separately
-if (substring(cruiseName,1,4)=="BFAS") {
+if (getEstByAge(Species[[Estspecies]])) {
   
-  BioAtMat <- lapply(Strata,getBioAtMat,marktypes=rep.MTs)
+  #no groups specified for boarfish as maturity key was input separately
+  if (substring(cruiseName,1,4)=="BFAS") {
+    
+    BioAtMat <- lapply(Strata,getBioAtMat,marktypes=rep.MTs)
+  
+    #total
+    BioAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),BioAtMat))
+    #percentages
+    BioAtMat[['%']] <- 100.0*BioAtMat[['Total']]/sum(BioAtMat[['Total']])
+    
+  } else if (substring(cruiseName,1,5)=="NWHAS") { 
+  
+    BioAtMat <- lapply(Strata,getBioAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+                                                                           "Mature"=getMatureCodes(Species[[Estspecies]]),
+                                                                           "Spent"=getSpentCodes(Species[[Estspecies]])))
+    
+    #total
+    BioAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),BioAtMat))
+    #percentages
+    BioAtMat[['%']] <- 100.0*BioAtMat[['Total']]/sum(BioAtMat[['Total']])
+    
+    #VIaN only
+    VIaN <- Strata[lapply(Strata,getICESarea)=="VIaN"]
+    VIaN.BioAtMat <- lapply(VIaN,getBioAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+                                                                              "Mature"=getMatureCodes(Species[[Estspecies]]),
+                                                                              "Spent"=getSpentCodes(Species[[Estspecies]])))
+    BioAtMat[['VIaN']] <- Reduce("+",Filter(Negate(is.null),VIaN.BioAtMat))
+    #VIaS only
+    VIaS <- Strata[lapply(Strata,getICESarea)=="VIaS"]
+    VIaS.BioAtMat <- lapply(VIaS,getBioAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+                                                                              "Mature"=getMatureCodes(Species[[Estspecies]]),
+                                                                              "Spent"=getSpentCodes(Species[[Estspecies]])))
+    BioAtMat[['VIaS']] <- Reduce("+",Filter(Negate(is.null),VIaS.BioAtMat))
+    #VIIb only
+    VIIb <- Strata[lapply(Strata,getICESarea)=="VIIb"]
+    VIIb.BioAtMat <- lapply(VIIb,getBioAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+                                                                              "Mature"=getMatureCodes(Species[[Estspecies]]),
+                                                                              "Spent"=getSpentCodes(Species[[Estspecies]])))
+    BioAtMat[['VIIb']] <- Reduce("+",Filter(Negate(is.null),VIIb.BioAtMat))
+    
+  } else if (substring(cruiseName,1,5)=="CSHAS") { 
+  
+    BioAtMat <- lapply(Strata,getBioAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+                                                                           "Mature"=getMatureCodes(Species[[Estspecies]]),
+                                                                           "Spent"=getSpentCodes(Species[[Estspecies]])))
+    
+    #total
+    BioAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),BioAtMat))
+    #percentages
+    BioAtMat[['%']] <- 100.0*BioAtMat[['Total']]/sum(BioAtMat[['Total']])
+    
+  }
+  
+  op<-lapply(BioAtMat,formatOPLine,ages=c("Immature","Mature","Spent"),numfmt="%.1f")
+  #add name to start of list
+  for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
+  #write header
+  writeOPLine(headers[4],file=paste(tables.dir,"BioAtMat.csv",sep=""),append=FALSE)
+  #write details
+  lapply(op,writeOPLine,file=paste(tables.dir,"BioAtMat.csv",sep=""))
 
-  #total
-  BioAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),BioAtMat))
-  #percentages
-  BioAtMat[['%']] <- 100.0*BioAtMat[['Total']]/sum(BioAtMat[['Total']])
-  
-} else if (substring(cruiseName,1,5)=="NWHAS") { 
-
-  BioAtMat <- lapply(Strata,getBioAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[species]]),
-                                                                         "Mature"=getMatureCodes(Species[[species]]),
-                                                                         "Spent"=getSpentCodes(Species[[species]])))
-  
-  #total
-  BioAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),BioAtMat))
-  #percentages
-  BioAtMat[['%']] <- 100.0*BioAtMat[['Total']]/sum(BioAtMat[['Total']])
-  
-  #VIaN only
-  VIaN <- Strata[lapply(Strata,getICESarea)=="VIaN"]
-  VIaN.BioAtMat <- lapply(VIaN,getBioAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[species]]),
-                                                                            "Mature"=getMatureCodes(Species[[species]]),
-                                                                            "Spent"=getSpentCodes(Species[[species]])))
-  BioAtMat[['VIaN']] <- Reduce("+",Filter(Negate(is.null),VIaN.BioAtMat))
-  #VIaS only
-  VIaS <- Strata[lapply(Strata,getICESarea)=="VIaS"]
-  VIaS.BioAtMat <- lapply(VIaS,getBioAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[species]]),
-                                                                            "Mature"=getMatureCodes(Species[[species]]),
-                                                                            "Spent"=getSpentCodes(Species[[species]])))
-  BioAtMat[['VIaS']] <- Reduce("+",Filter(Negate(is.null),VIaS.BioAtMat))
-  #VIIb only
-  VIIb <- Strata[lapply(Strata,getICESarea)=="VIIb"]
-  VIIb.BioAtMat <- lapply(VIIb,getBioAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[species]]),
-                                                                            "Mature"=getMatureCodes(Species[[species]]),
-                                                                            "Spent"=getSpentCodes(Species[[species]])))
-  BioAtMat[['VIIb']] <- Reduce("+",Filter(Negate(is.null),VIIb.BioAtMat))
-  
-} else if (substring(cruiseName,1,5)=="CSHAS") { 
-
-  BioAtMat <- lapply(Strata,getBioAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[species]]),
-                                                                         "Mature"=getMatureCodes(Species[[species]]),
-                                                                         "Spent"=getSpentCodes(Species[[species]])))
-  
-  #total
-  BioAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),BioAtMat))
-  #percentages
-  BioAtMat[['%']] <- 100.0*BioAtMat[['Total']]/sum(BioAtMat[['Total']])
-  
 }
-
-op<-lapply(BioAtMat,formatOPLine,ages=c("Immature","Mature","Spent"),numfmt="%.1f")
-#add name to start of list
-for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
-#write header
-writeOPLine(headers[4],file=paste(tables.dir,"BioAtMat.csv",sep=""),append=FALSE)
-#write details
-lapply(op,writeOPLine,file=paste(tables.dir,"BioAtMat.csv",sep=""))
 
 
 #Schools, Biomass and Abundance by strata Report

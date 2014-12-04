@@ -55,7 +55,7 @@ cat(length(Strata),"strata read in\n");
 Species <- loadSpeciesDetails(getCode(Cruise));
 cat(length(Species),"species read in\n")
 
-#Mark Yypes
+#Mark Types
 MarkTypes <- loadMarkTypes(CruiseName = getName(Cruise), SpeciesName = getTargetCommon(Cruise));
 cat(length(MarkTypes),"mark types read in\n")
 
@@ -64,14 +64,17 @@ cat(length(MarkTypes),"mark types read in\n")
 #loads initial data for Hauls, Samples, LF, Ags, SA
 load(paste("./Data/",getName(Cruise),"/",getName(Cruise),".RData",sep=""))
 
+table(SA$Region_class)
+
 #format Haul data
 Hauls <- loadHauls(getCode(Cruise));
 cat(length(Hauls),"hauls read in\n");
 
 #process SA data for the appropriate mark types
 SA <- aggregateSA(SA = SA, MarkTypes = MarkTypes)
+#check this matches with mark types listed above. Missing mark types may indicate that the NASC_name of the MarkTypes needs updating.
+#Numbers may not match since data has been aggregated.
 table(unlist(lapply(SA,getMarkType)))
-#source("./Scripts/SA.r");
 
 #create plots directory
 plots.dir<-paste(getwd(),"/Plots/",getName(Cruise),"/",getTargetCommon(Cruise),"/",sep="");
