@@ -14,7 +14,7 @@ Species Common::Sprat
 Species Scientific::Sprattus Sprattus
 Include::True
 Haul Assignment Type::Nearest
-Hauls::
+Hauls::3,14
 
 Mark Type::Probably Sprat
 NASC Name::Probably Sprat
@@ -22,13 +22,4 @@ Species Common::Sprat
 Species Scientific::Sprattus Sprattus
 Include::True
 Haul Assignment Type::Nearest
-Hauls::
-
-Mark Type::Sprat In A Mix
-NASC Name::Sprat In A Mix
-Species Common::Sprat
-Species Scientific::Sprattus Sprattus
-Include::True
-Haul Assignment Type::Nearest
-Mixed::Clupea Herrangus,Trachurus Trachurus,Scomber Scombrus,Sardina Pilchardus
-Hauls::
+Hauls::3,14
