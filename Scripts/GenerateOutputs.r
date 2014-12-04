@@ -326,17 +326,18 @@ lapply(op,writeOPLine,file=paste(tables.dir,"HaulComp.csv",sep=""))
 
 #Abundance at Age as abundance and biomass
 #----------------------------------------------------------------------
-
-AbdAtLen <- combineLFs(lapply(Strata,getAbdAtLen,marktypes=rep.MTs))
-LenAtAge <- lapply(seq_along(AbdAtLen),function(i) AbdAtLen[i]*ALK[names(AbdAtLen)[i],])
-names(LenAtAge) <- names(AbdAtLen)
-op<-lapply(LenAtAge,formatOPLine,ages=rep.Ages,numfmt="%.2f",subzero="-")
-#add name to start of list
-for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
-
-writeOPLine(headers[7],file=paste(tables.dir,"LenAtAge.csv",sep=""),append=FALSE)
-#write details
-lapply(op,writeOPLine,file=paste(tables.dir,"LenAtAge.csv",sep=""))
+if (getEstByAge(Species[[Estspecies]])) {  
+  AbdAtLen <- combineLFs(lapply(Strata,getAbdAtLen,marktypes=rep.MTs))
+  LenAtAge <- lapply(seq_along(AbdAtLen),function(i) AbdAtLen[i]*ALK[names(AbdAtLen)[i],])
+  names(LenAtAge) <- names(AbdAtLen)
+  op<-lapply(LenAtAge,formatOPLine,ages=rep.Ages,numfmt="%.2f",subzero="-")
+  #add name to start of list
+  for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
+  
+  writeOPLine(headers[7],file=paste(tables.dir,"LenAtAge.csv",sep=""),append=FALSE)
+  #write details
+  lapply(op,writeOPLine,file=paste(tables.dir,"LenAtAge.csv",sep=""))
+}
 
 #11/10/2014
 #summary by mark type
@@ -364,7 +365,8 @@ ssb.mt <- ssb.mt[ssb.mt>0]
 ssb_abd.mt <- ssb_abd.mt[ssb_abd.mt>0]
 
 #write main header
-writeOPLine("Herring,Millions,Biomass(t),% contribution",file=paste(tables.dir,"SpeciesByMarkType.csv",sep=""),append=FALSE)
+writeOPLine(paste(Estspecies,",Millions,Biomass(t),% contribution",sep=""),
+            file=paste(tables.dir,"SpeciesByMarkType.csv",sep=""),append=FALSE)
 #write subhead for total estimate
 writeOPLine("Total estimate",file=paste(tables.dir,"SpeciesByMarkType.csv",sep=""))
 #loop over mark types
