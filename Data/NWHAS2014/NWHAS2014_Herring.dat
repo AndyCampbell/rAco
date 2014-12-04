@@ -1,0 +1,42 @@
+Acoustic Survey Cruise Details
+Cruise Code::CE14010
+Cruise Name::NWHAS2014
+Desc::North-West Herring Acoustic Survey, 2014
+Vessel::Celtic Explorer
+Start Date::2014-06-22 16:00:00
+End Date::2014-07-12 06:00:00
+Target Species Common::Herring
+Target Species Scientific::Clupea Herrangus
+
+Mark Type::Definitely Herring
+NASC Name::Def Herring
+Species Common::Herring
+Species Scientific::Clupea Herrangus
+Include::True
+Haul Assignment Type::Nearest
+Hauls::6,8,9,10,13,16,20
+
+Mark Type::Probably Herring
+NASC Name::Probably Herring
+Species Common::Herring
+Species Scientific::Clupea Herrangus
+Include::True
+Haul Assignment Type::Nearest
+Hauls::6,8,9,10,13,16,20
+
+Mark Type::Herring In A Mix
+NASC Name::Herring In A Mix
+Species Common::Herring
+Species Scientific::Clupea Herrangus
+Include::True
+Haul Assignment Type::Nearest
+Mixed::Scomber Scombrus,Capros Aper
+Hauls::25
+
+Mark Type::Possibly Herring
+NASC Name::Possibly Herring
+Species Common::Herring
+Species Scientific::Clupea Herrangus
+Include::False
+Haul Assignment Type::Nearest
+Hauls::6,8,9,10,13,16,20

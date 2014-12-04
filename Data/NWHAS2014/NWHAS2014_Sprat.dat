@@ -1,0 +1,34 @@
+Acoustic Survey Cruise Details
+Cruise Code::CE14010
+Cruise Name::NWHAS2014
+Desc::North-West Herring Acoustic Survey, 2014
+Vessel::Celtic Explorer
+Start Date::2014-06-22 16:00:00
+End Date::2014-07-12 06:00:00
+Target Species Common::Sprat
+Target Species Scientific::Sprattus Sprattus
+
+Mark Type::Definitely Sprat
+NASC Name::Def Sprat
+Species Common::Sprat
+Species Scientific::Sprattus Sprattus
+Include::True
+Haul Assignment Type::Nearest
+Hauls::
+
+Mark Type::Probably Sprat
+NASC Name::Probably Sprat
+Species Common::Sprat
+Species Scientific::Sprattus Sprattus
+Include::True
+Haul Assignment Type::Nearest
+Hauls::
+
+Mark Type::Sprat In A Mix
+NASC Name::Sprat In A Mix
+Species Common::Sprat
+Species Scientific::Sprattus Sprattus
+Include::True
+Haul Assignment Type::Nearest
+Mixed::Clupea Herrangus,Trachurus Trachurus,Scomber Scombrus,Sardina Pilchardus
+Hauls::
