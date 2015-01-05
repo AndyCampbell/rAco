@@ -1372,6 +1372,7 @@ aggregateSA <- function(SA,MarkTypes) {
   }
 
   #return only marks with matching marktypes
-  ret[which(lapply(ret,getMarkType)%in%unlist(lapply(MarkTypes,getNASCName)))]
+  #ret[which(lapply(ret,getMarkType)%in%unlist(lapply(MarkTypes,getNASCName)))]
+  ret[which(toupper(lapply(ret,getMarkType))%in%unlist(toupper(lapply(MarkTypes,getNASCName))))]
   
 }
