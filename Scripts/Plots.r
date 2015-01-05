@@ -5,13 +5,14 @@ mt<-lapply(MarkTypes,getNASCName)
 
 #plot Cruise
 plot(Cruise,
-     strata=Strata,
-     transects=Transects,
-     ctds=(if (exists("CTDs")) {CTDs} else {NULL}),
-     hauls=(if (exists("Hauls")) {Hauls} else {NULL}),
-     sa=(if (exists("SA")) {SA[which(lapply(SA,getMarkType)%in%unlist(mt))]} else {NULL}),
-     filename=paste(plots.dir,"//",getName(Cruise),".png",sep=""),
-     leg.pos="topleft")
+     strata = Strata,
+     transects = Transects,
+     ctds = (if (exists("CTDs")) {CTDs} else {NULL}),
+     hauls = (if (exists("Hauls")) {Hauls} else {NULL}),
+     sa = (if (exists("SA")) {SA[which(toupper(lapply(SA,getMarkType))%in%toupper(unlist(mt)))]} else {NULL}),
+     sasummary = TRUE,
+     filename = paste(plots.dir,"//",getName(Cruise),".png",sep=""),
+     leg.pos = "topleft")
 
 #plot locations of CTD casts
 plot(Cruise,
