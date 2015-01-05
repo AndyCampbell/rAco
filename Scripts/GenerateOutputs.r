@@ -417,3 +417,10 @@ lop <- paste(lop,round(sum(ssb.mt)),sep=",")
 lop <- paste(lop,sprintf("%.1f",100.0*sum(ssb.mt/sum(ssb.mt))),sep=",")
 writeOPLine(lop,file=paste(tables.dir,"SpeciesByMarkType.csv",sep=""))
 
+#05/01/2015
+#results by SR
+plot(Cruise,
+     filename = paste(plots.dir,"//",getName(Cruise),"_BioBySR.png",sep=""),
+     strata = Strata,
+     srBoundaries = TRUE,
+     printBio = TRUE)
