@@ -17,6 +17,7 @@ tables.dir<-paste(getwd(),"/Tables/",getName(Cruise),"/",sep="");
 dir.create(tables.dir,recursive=TRUE,showWarnings=FALSE);
 tables.dir<-paste(tables.dir,Estspecies,"/",sep="");
 dir.create(tables.dir,recursive=FALSE,showWarnings=FALSE);
+plots.dir<-paste(getwd(),"/Plots/",getName(Cruise),"/",getTargetCommon(Cruise),"/",sep="");
 
 #the following are generated (not in all cases)
 
