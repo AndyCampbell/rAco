@@ -1,0 +1,17 @@
+Acoustic Survey Cruise Details
+Cruise Code::CE13009
+Cruise Name::NWHAS2013
+Desc::North-West Herring Acoustic Survey, 2013
+Vessel::Celtic Explorer
+Start Date::2013-06-22 00:00:01
+End Date::2013-07-11 23:59:59
+Target Species Common::Boarfish
+Target Species Scientific::Capros Aper
+
+Mark Type::Definitely Boarfish
+NASC Name::Def Boarfish
+Species Common::Boarfish
+Species Scientific::Capros Aper
+Include::True
+Haul Assignment Type::Nearest
+Hauls::9,15
