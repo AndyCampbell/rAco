@@ -1029,12 +1029,12 @@ displayKey <- function(key,round=2){
   
 }
 
-applyKey <- function(data,key) {
+applyKey <- function(data,key,length.offset=0.25) {
   #apply the supplied key to the data
   #data is a vector at length
   
   #apply the length offset to the rownames of the key
-  rownames(key) = as.character(as.numeric(rownames(key)) + 0.25);
+  rownames(key) = as.character(as.numeric(rownames(key)) + length.offset);
   
   #TO DO
   #key should contain a row with data that sums to 1 for each of the column names of the data
@@ -1205,12 +1205,15 @@ writeOPLine <- function(x,file,append=TRUE){
   write(x,file,append=append)
 }
 
-formatOPLine <- function(x,ages,numfmt,subzero,tex=FALSE,total=TRUE){
+formatOPLine <- function(x,ages,numfmt,subzero,tex=FALSE,total=TRUE,colCount,skipb4Total=0){
   #format a line of output based on the required ages
   #if tex = TRUE the line is for inclusion in a TEX table,
   #otherwise it's a tab separated string
   #if total is TRUE a total is appended
   #if subzero is supplied, replace any zero values (not totals) with this
+  #if a colCount is supplied, pad the line out to this number of columns, using the subzero symbol if provided
+  #if a non zero skipb4Total value is supplied, skip this number of columns before inserting the total
+  #(only tested when total=TRUE)
   
   ret <- ""
   tot <- 0
@@ -1242,11 +1245,27 @@ formatOPLine <- function(x,ages,numfmt,subzero,tex=FALSE,total=TRUE){
   
   #add total
   if (total){
-    paste(ret,sprintf(numfmt,tot),sep=",")
+    if (skipb4Total>0){
+      ret <- paste(ret,paste(rep("-",skipb4Total),collapse=","),sprintf(numfmt,tot),sep=",")
+    } else {
+      ret <- paste(ret,sprintf(numfmt,tot),sep=",")
+    }
   } else {
-    paste(ret,"-",sep=",")
+    ret <- paste(ret,"-",sep=",")
   }
   
+  #check column count, if supplied
+  if (!missing(colCount)) {
+    if (colCount>length(unlist(strsplit(ret,",")))) {
+      if (!missing(subzero)){
+        ret <- paste(ret,paste(rep(subzero,colCount-length(unlist(strsplit(ret,",")))),collapse=","),sep=",")
+      } else {
+        ret <- paste(ret,paste(rep("",colCount-length(unlist(strsplit(ret,",")))),collapse=","),sep=",")
+      }
+    }
+  }
+  
+  ret
   
 }
 

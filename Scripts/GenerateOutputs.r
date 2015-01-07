@@ -33,7 +33,8 @@ plots.dir<-paste(getwd(),"/Plots/",getName(Cruise),"/",getTargetCommon(Cruise),"
 #ages to be reported
 #rep.Ages <- seq(range(unlist(lapply(Strata,getAgeRange)))[1],range(unlist(lapply(Strata,getAgeRange)))[2],by=1)
 #use the ALK
-rep.Ages <- as.numeric(colnames(ALK))
+#rep.Ages <- as.numeric(colnames(ALK))
+rep.Ages <- seq(0,max(as.numeric(colnames(ALK))))
 #marktypes to be reported
 rep.MTs <- names(lapply(spe.MarkTypes,getIncludeInEstimates))[unlist(lapply(spe.MarkTypes,getIncludeInEstimates))]
 
@@ -47,7 +48,7 @@ headers<-c(paste("Strata",paste(rep.Ages,collapse=","),"Total",sep=","),
 
 if (getEstByAge(Species[[Estspecies]])) {
   headers <- c(headers,
-               paste("Length (cm)","Age 0","(rings) 1",paste(seq(2,rep.Ages[length(rep.Ages)-1]),collapse=","),"Abund. (mills)","Biomass (kt)","Mn Wgt (g)",sep=","))
+               paste("Len (cm)","Age 0","(rings) 1",paste(seq(2,rep.Ages[length(rep.Ages)]),collapse=","),"Abd. (x10^6)","Biomass (kt)","Mean Wgt (g)",sep=","))
 }       
 
 #Abundance at age by strata Report
@@ -332,21 +333,68 @@ lapply(op,writeOPLine,file=paste(tables.dir,"HaulComp.csv",sep=""))
 #----------------------------------------------------------------------
 if (getEstByAge(Species[[Estspecies]])) {  
   AbdAtLen <- combineLFs(lapply(Strata,getAbdAtLen,marktypes=rep.MTs))
+  AbdAtMat <- combineLFs(lapply(Strata,getAbdAtMat,marktypes=rep.MTs))
   LenAtAge <- lapply(seq_along(AbdAtLen),function(i) AbdAtLen[i]*ALK[names(AbdAtLen)[i],])
   names(LenAtAge) <- names(AbdAtLen)
   op<-lapply(LenAtAge,formatOPLine,ages=rep.Ages,numfmt="%.2f",subzero="-")
 
-  #biomass 
+  #biomass at length
   BioAtLen <- combineLFs(lapply(Strata,getBioAtLen,marktypes=rep.MTs))
   
-  #add name to start of list, biomass to end
+  #mean weight at length 
+  MnWgtAtLen <- vector("numeric",length(op))
+  
+  #add name to start of list, total biomass (in kt), mean weight (g) to end
   for (i in 1:length(op)){
-    op[[i]]<-paste(names(op)[i],op[[i]],",",sprintf("%.2f",BioAtLen[names(op)[i]]),sep="")
+    MnWgtAtLen[i] <- BioAtLen[names(op)[i]]/as.numeric(rev(unlist(strsplit(op[[i]],split=",")))[1])
+    op[[i]]<-paste(names(op)[i],op[[i]],",",
+                   sprintf("%.2f",BioAtLen[names(op)[i]]/1e3),",",
+                   sprintf("%.1f",MnWgtAtLen[i]),
+                   sep="")
   }
   
   writeOPLine(headers[7],file=paste(tables.dir,"LenAtAge.csv",sep=""),append=FALSE)
   #write details
   lapply(op,writeOPLine,file=paste(tables.dir,"LenAtAge.csv",sep=""))
+  
+  #summary lines
+
+  #total abundance at age
+  TotAbdAtAge <- Reduce("+",Filter(Negate(is.null),lapply(Strata,getAbdAtAge,marktypes=rep.MTs)))
+  writeOPLine(paste("Abd",formatOPLine(TotAbdAtAge,ages = rep.Ages,numfmt = "%.2f",
+                                       subzero = "-",colCount = length(unlist(strsplit(headers[7],",")))),
+                    sep=""),file = paste(tables.dir,"LenAtAge.csv",sep=""))
+  
+  #total biomass at age
+  TotBioAtAge <- Reduce("+",Filter(Negate(is.null),lapply(Strata,getBioAtAge,marktypes=rep.MTs)))
+  writeOPLine(paste("Biomass",formatOPLine(TotBioAtAge,ages = rep.Ages,numfmt = "%.2f",
+                                           subzero = "-",colCount = length(unlist(strsplit(headers[7],","))),
+                                           skipb4Total=1),
+                    sep=""),file = paste(tables.dir,"LenAtAge.csv",sep=""))
+  
+  #mean weight at age
+  MnWgtAtAge <- MnLenAtAge <- vector("numeric",length(rep.Ages))
+  names(MnWgtAtAge) <- names(MnLenAtAge) <- rep.Ages
+  
+  for (a in rep.Ages) {
+    if (a%in%as.numeric(names(LenAtAge[[1]]))) {
+      if (sum(unlist(lapply(LenAtAge,"[[",a)))>0) {
+        MnWgtAtAge[as.character(a)] <- sum(unlist(lapply(LenAtAge,"[[",a))*MnWgtAtLen)/sum(unlist(lapply(LenAtAge,"[[",a)))
+        MnLenAtAge[as.character(a)] <- sum(unlist(lapply(LenAtAge,"[[",a))*as.numeric(names(LenAtAge)))/sum(unlist(lapply(LenAtAge,"[[",a)))
+      }
+    }
+  }
+
+  writeOPLine(paste("Mean Wgt",formatOPLine(MnWgtAtAge,ages = rep.Ages,numfmt = "%.1f",
+                                           subzero = "-",total = FALSE, 
+                                           colCount = length(unlist(strsplit(headers[7],",")))),
+                    sep=""),file = paste(tables.dir,"LenAtAge.csv",sep=""))
+    
+  writeOPLine(paste("Mean Len",formatOPLine(MnLenAtAge,ages = rep.Ages,numfmt = "%.1f",
+                                            subzero = "-",total = FALSE, 
+                                            colCount = length(unlist(strsplit(headers[7],",")))),
+                    sep=""),file = paste(tables.dir,"LenAtAge.csv",sep=""))
+  
 }
 
 #11/10/2014
