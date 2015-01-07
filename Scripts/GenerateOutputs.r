@@ -43,9 +43,12 @@ headers<-c(paste("Strata",paste(rep.Ages,collapse=","),"Total",sep=","),
            paste("Strata","Immature","Mature","Spent","Total",sep=","),
            paste("Strata","Immature","Mature","Spent","Total",sep=","),
            paste("Stratum","No Tran","No Sch","Def Sch","Mix Sch","Prob Sch","% Zeros","Def Bio","Mix Bio","Prob Bio","Biomass (000's t)","SSB (000's t)","Abund (mills)",sep=","),
-           paste("No.","Date","Time","Lat","Lon","Target Depth (m)","Bottom Depth (m)","Bulk Catch (kg)","Sampled Catch (kg)",sep=","),
-           paste("Length (cm)","Age 0","(rings) 1","2","3","4","5","6","7","8","9","10","Abund. (mills)","Biomass (kt)","Mn Wgt (g)",sep=","))
+           paste("No.","Date","Time","Lat","Lon","Target Depth (m)","Bottom Depth (m)","Bulk Catch (kg)","Sampled Catch (kg)",sep=","))
 
+if (getEstByAge(Species[[Estspecies]])) {
+  headers <- c(headers,
+               paste("Length (cm)","Age 0","(rings) 1",paste(seq(2,rep.Ages[length(rep.Ages)-1]),collapse=","),"Abund. (mills)","Biomass (kt)","Mn Wgt (g)",sep=","))
+}       
 
 #Abundance at age by strata Report
 #only for aged species
@@ -332,8 +335,14 @@ if (getEstByAge(Species[[Estspecies]])) {
   LenAtAge <- lapply(seq_along(AbdAtLen),function(i) AbdAtLen[i]*ALK[names(AbdAtLen)[i],])
   names(LenAtAge) <- names(AbdAtLen)
   op<-lapply(LenAtAge,formatOPLine,ages=rep.Ages,numfmt="%.2f",subzero="-")
-  #add name to start of list
-  for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
+
+  #biomass 
+  BioAtLen <- combineLFs(lapply(Strata,getBioAtLen,marktypes=rep.MTs))
+  
+  #add name to start of list, biomass to end
+  for (i in 1:length(op)){
+    op[[i]]<-paste(names(op)[i],op[[i]],",",sprintf("%.2f",BioAtLen[names(op)[i]]),sep="")
+  }
   
   writeOPLine(headers[7],file=paste(tables.dir,"LenAtAge.csv",sep=""),append=FALSE)
   #write details
