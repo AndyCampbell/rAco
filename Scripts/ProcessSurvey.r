@@ -23,6 +23,7 @@ source("./Scripts/Init.r");
 
 
 #load Cruise data file
+
 Cruise <- loadCruise(CruiseName = "NWHAS2013", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "NWHAS2013", SpeciesName = "Boarfish")
 
