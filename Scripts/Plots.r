@@ -16,19 +16,20 @@ plot(Cruise,
 
 #plot locations of CTD casts
 plot(Cruise,
-     transects=Transects,
-     ctds=(if (exists("CTDs")) {CTDs} else {NULL}),
-     filename=paste(plots.dir,"//",getName(Cruise),"_CTD.png",sep=""),
-     srboundaries=TRUE,
-     bathycontours=c(250,300,400,500))
+     transects = Transects,
+     ctds = (if (exists("CTDs")) {CTDs} else {NULL}),
+     filename = paste(plots.dir,"//",getName(Cruise),"_CTD.png",sep=""),
+     srboundaries = TRUE,
+     bathycontours = c(250,300,400,500))
 
 #plot locations of hauls
 plot(Cruise,
-     transects=Transects,
-     hauls=Hauls,
-     filename=paste(plots.dir,"//",getName(Cruise),"_Haul.png",sep=""),
-     srboundaries=TRUE,
-     bathycontours=c(250,300,400,500))
+     transects = Transects,
+     hauls = Hauls,
+     filename = paste(plots.dir,"//",getName(Cruise),"_Haul.png",sep=""),
+     srboundaries = TRUE,
+     bathycontours = c(250,300,400,500),
+     Nlim = 58.5)
 
 #plots of marktypes
 for (p in 1:length(mt)){

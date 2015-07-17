@@ -15,76 +15,91 @@
 #******_Species.dat
 
 #clear memory
-rm(list=ls());
-gc();
+rm(list=ls())
+gc()
 
 #load in libraries, function definitions, plotting data
-source("./Scripts/Init.r");
-
+source("./Scripts/Init.r")
 
 #load Cruise data file
 
-Cruise <- loadCruise(CruiseName = "NWHAS2013", SpeciesName = "Herring")
+#Cruise <- loadCruise(CruiseName = "BWAS2015", SpeciesName = "Blue Whiting")
+#Cruise <- loadCruise(CruiseName = "NWHAS2013", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "NWHAS2013", SpeciesName = "Boarfish")
-
 #Cruise <- loadCruise(CruiseName = "NWHAS2014", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "NWHAS2014", SpeciesName = "Boarfish")
 #Cruise <- loadCruise(CruiseName = "NWHAS2014", SpeciesName = "Sprat")
-
 #Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Sprat")
+Cruise <- loadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
+#Cruise <- loadCruise(CruiseName = "COM01_2011", SpeciesName = "Boarfish")   #boarfish 2011, excluding midnight-4am
+#Cruise <- loadCruise(CruiseName = "COM02_2011", SpeciesName = "Boarfish")   #boarfish 2011, 24hrs
+
+
 
 #print cruise summary to the screen
 summary(Cruise)
-
-#load vessel track if it's available
-if (file.exists(paste("./RData/Track_",getName(Cruise),".rda",sep=""))) {
-  load(file=paste("./RData/Track_",getName(Cruise),".rda",sep=""))
-  cat("Track data read in\n")
-}
-
-#CTD data
-CTDs <- loadCTDs(getCode(Cruise),getName(Cruise));
-cat(length(CTDs),"CTDs read in\n");
-
-#Transect data
-Transects <- loadTransects(getCode(Cruise),getName(Cruise));
-cat(length(Transects),"transects read in\n");
-
-#Strata data
-Strata <- loadStrata(getCode(Cruise),getName(Cruise));
-cat(length(Strata),"strata read in\n");
-
-#Species Details (target strength, maturity codes)
-Species <- loadSpeciesDetails(getCode(Cruise));
-cat(length(Species),"species read in\n")
-
-#Mark Types
-MarkTypes <- loadMarkTypes(CruiseName = getName(Cruise), SpeciesName = getTargetCommon(Cruise));
-cat(length(MarkTypes),"mark types read in\n")
 
 #Access DB data (already saved in .RData file using 32-bit R)
 #see script DB2RData.r in this project
 #loads initial data for Hauls, Samples, LF, Ags, SA
 load(paste("./Data/",getName(Cruise),"/",getName(Cruise),".RData",sep=""))
 
-table(SA$Region_class)
+
+#load vessel track if it's available
+if (file.exists(paste("./RData/Track_", getName(Cruise), ".rda", sep = ""))) {
+  load(file = paste("./RData/Track_", getName(Cruise), ".rda", sep = ""))
+  cat("Track data read in\n")
+}
+
+#CTD data
+#If object DBCTDs exists then data has been read from table FSS_CTD from the access DB
+#otherwise, assume that the csv has been supplied
+CTDs <- fLoad_CTDs(getCode(Cruise), getName(Cruise),
+                   DBCTDs = {if (exists("DBCTDs")){DBCTDs} else {NULL}})
+cat(length(CTDs), "CTDs read in\n")
+
+#Transect data.
+#If object DBtransects exists then they have been read in from table FSS_Transect from the DB
+#otherwise, assume the csv has been supplied
+Transects <- fLoad_Transects(getCode(Cruise), getName(Cruise),
+                             DBTransects = {if (exists("DBTransects")){DBTransects} else {NULL}})
+cat(length(Transects), "transects read in\n")
+
+#Strata data
+Strata <- fLoad_Strata(getCode(Cruise), getName(Cruise),
+                       DBStrata = {if (exists("DBStrata")){DBStrata} else {NULL}})
+cat(length(Strata), "strata read in\n")
+
+#Species Details (target strength, maturity codes)
+Species <- fLoad_Species_Details(getCode(Cruise))
+cat(length(Species), "species read in\n")
+
+#Mark Types
+MarkTypes <- fLoad_Mark_Types(CruiseName = getName(Cruise), SpeciesName = getTargetCommon(Cruise))
+cat(length(MarkTypes), "mark types read in\n")
+
+#report of the region classes in the SA data
+if (exists("SA")) {table(SA$Region_class)}
 
 #format Haul data
-Hauls <- loadHauls(getCode(Cruise));
-cat(length(Hauls),"hauls read in\n");
+Hauls <- fLoad_Hauls(getCode(Cruise))
+cat(length(Hauls), "hauls read in\n")
 
 #process SA data for the appropriate mark types
-SA <- aggregateSA(SA = SA, MarkTypes = MarkTypes)
-#check this matches with mark types listed above. Missing mark types may indicate that the NASC_name of the MarkTypes needs updating.
+SA <- fAggregate_SA(SA = {if (exists("SA")){SA}else{NULL}}, MarkTypes = MarkTypes)
+
+#check this matches with mark types listed above. Missing mark types may indicate that the NASC_name of 
+#the MarkTypes needs updating.
 #Numbers may not match since data has been aggregated.
 table(unlist(lapply(SA,getMarkType)))
 
 #create plots directory
-plots.dir<-paste(getwd(),"/Plots/",getName(Cruise),"/",getTargetCommon(Cruise),"/",sep="");
+plots.dir<-paste(getwd(), "/Plots/", getName(Cruise), "/", getTargetCommon(Cruise), "/", sep="")
+
 #create the output directory, suppress the showWarnings so that no warning
 #is issued if the folder already exists
-dir.create(plots.dir,recursive=TRUE,showWarnings=FALSE);
+dir.create(plots.dir, recursive=TRUE, showWarnings=FALSE);
 
 #generate some survey level plots
 source("./Scripts/Plots.r")
@@ -153,7 +168,7 @@ for (i in seq(length=length(Species))){
 #and create the folders
 #subset species to get those to be estimated for abundance
 #est.Species<-Species[lapply(Species,getEstAbd)==TRUE]
-est.Species <- Species[which(unlist(lapply(Species,getTargetCommon))==getTargetCommon(Cruise))]
+est.Species <- Species[which(toupper(unlist(lapply(Species,getTargetCommon)))==toupper(getTargetCommon(Cruise)))]
 
 #results data structure
 out <- vector("list",length(est.Species));
@@ -208,16 +223,19 @@ for (spe in seq(length=length(est.Species))){
   #create ALK if required
   if (getEstByAge(est.Species[[spe]])) {
     
-    #if this is a boarfish calculation, the ALK is stored externally so will need to read it in from 
-    #appropriate file
+    #check if ALK is to be read in from separate csv 
 
-    if (getCode(Cruise)=='BFAS2013') {
+    if (getName(Cruise) %in% c('BFAS2013','BWAS2015','COM01_2011')) {
+      
+      cat("reading in ALK\n")
       
       #read ALK from file
-      ALK <- read.table("./DATA/BFAS2013/ALK.csv",T,skip=1,row.names=1,sep=",",fill=T)
+      ALK <- read.table(paste0("./DATA/",getName(Cruise),"/ALK.csv"),T,skip=1,row.names=1,sep=",",fill=T)
       colnames(ALK)<-as.character(seq(1,15))
       
     } else {
+
+      cat("generating ALK\n")
       
       #range of length classes in LF data
       LF.Range <- range(unlist(lapply(Hauls,getLFRange,species=spe_name)),na.rm=TRUE);
@@ -246,15 +264,14 @@ for (spe in seq(length=length(est.Species))){
   #create MLK if required
   if (getEstByMat(est.Species[[spe]])) {
 
-    #if this is a boarfish calculation, the MLK is stored externally so will need to read it in from 
-    #appropriate file
+    #check if MLK is to be read in from separate csv 
     
-    if (getCode(Cruise)=='BFAS2013') {
-    
-      #read MLK from file
-      MLK <- read.table("./DATA/BFAS2013/MLK.csv",T,skip=1,row.names=1,sep=",",fill=T)
+    if (getName(Cruise) %in% c('BFAS2013','BWAS2015','COM01_2011')) {
       
+      #read MLK from file
+      MLK <- read.table(paste0("./DATA/",getName(Cruise),"/MLK.csv"),T,skip=1,row.names=1,sep=",",fill=T)
       colnames(MLK) <- c("Immature","Mature","Spent")
+      #colnames(MLK) <- c(as.character(seq(1,8)))
       
     } else {
       
@@ -339,28 +356,29 @@ for (spe in seq(length=length(est.Species))){
       
       #marks for current transect
       #mk<-mtSA[lapply(mtSA,getTransectCode)==getCode(Transects[[tr]])];
-      mk<-mtSA[lapply(mtSA,getTransectCode)==tr];
+      mk <- mtSA[lapply(mtSA,getTransectCode)==tr];
 
       if (length(mk)>0){
 
          #get abundances,biomass for these marks
-         abd<-unlist(lapply(mk,abundance,target=spe_name));
-         bio<-unlist(lapply(mk,biomass,LW=getLW(est.Species[[spe]]),target=spe_name));
+         abd <- unlist(lapply(mk, abundance, target = spe_name))
+         bio <- unlist(lapply(mk, biomass, LW = getLW(est.Species[[spe]]), target=spe_name))
+         
          #and cell length
-         cell<-unlist(lapply(mk,getCellLength));    
-         cells<-unlist(lapply(mk,getCellLengths));
+         cell <- unlist(lapply(mk,getCellLength))   
+         cells <- unlist(lapply(mk,getCellLengths))
          
-         mean_abd <- tapply(abd*cells,names(abd),sum)/getTrackLength_nm(Transects[[tr]]);
-         mean_bio <- tapply(bio*cells,names(abd),sum)/getTrackLength_nm(Transects[[tr]]);
+         mean_abd <- tapply(abd*cells,names(abd),sum)/getTrackLength_nm(Transects[[tr]])
+         mean_bio <- tapply(bio*cells,names(abd),sum)/getTrackLength_nm(Transects[[tr]])
          
-         mn_abd <- as.numeric(mean_abd);
-         names(mn_abd) <- names(mean_abd);
-         mn_bio <- as.numeric(mean_bio);
-         names(mn_bio) <- names(mean_bio);
+         mn_abd <- as.numeric(mean_abd)
+         names(mn_abd) <- names(mean_abd)
+         mn_bio <- as.numeric(mean_bio)
+         names(mn_bio) <- names(mean_bio)
          
-         Transects[[tr]]<-setNumMarks(Transects[[tr]],getName(spe.MarkTypes[[mt]]),length(mk));
-         Transects[[tr]]<-setAbdAtLen(Transects[[tr]],getName(spe.MarkTypes[[mt]]),mn_abd);
-         Transects[[tr]]<-setBioAtLen(Transects[[tr]],getName(spe.MarkTypes[[mt]]),mn_bio);
+         Transects[[tr]] <- setNumMarks(Transects[[tr]], getName(spe.MarkTypes[[mt]]), length(mk))
+         Transects[[tr]] <- setAbdAtLen(Transects[[tr]], getName(spe.MarkTypes[[mt]]), mn_abd)
+         Transects[[tr]] <- setBioAtLen(Transects[[tr]], getName(spe.MarkTypes[[mt]]), mn_bio)
          
           if (!is.null(ALK)){
             Transects[[tr]]<-setAbdAtAge(Transects[[tr]],getName(spe.MarkTypes[[mt]]),applyKey(mn_abd[mn_bio>0],ALK));
@@ -377,7 +395,7 @@ for (spe in seq(length=length(est.Species))){
     
     #Loop over strata, select the appropriate transects and calculate the stratum 
     #results
-    cat("Looping over strats\n")
+    cat("Looping over strata\n")
     for (i in seq(length=length(Strata))){
       
       #stratum name

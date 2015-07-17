@@ -89,7 +89,7 @@ loadCruise <- function(CruiseName,SpeciesName) {
 }
 
 #loadMarkTypes <- function(CruiseCode){
-loadMarkTypes <- function(CruiseName,SpeciesName){
+fLoad_Mark_Types <- function(CruiseName, SpeciesName){
 
   #load cruise details from flat file and create cruise object
   fCruise <- paste("./Data/",CruiseName,"/",CruiseName,"_",SpeciesName,".dat",sep="")
@@ -466,95 +466,118 @@ loadMarkTypes <- function(CruiseName,SpeciesName){
 }
 
 
-loadCTDs <- function(CruiseCode,CruiseName) {
+fLoad_CTDs <- function(CruiseCode, CruiseName, DBCTDs=NULL) {
 
-  fCTD <- paste("./Data/",CruiseName,"/",CruiseName,"_CTD.csv",sep="")
-  
-  if (!file.exists(fCTD)) {
-    cat("No CTD data file found\n")
-    return(NULL)
-  }
-  
-  #load in CTD information from csv file
-  df.ctd <- read.csv(
-    file = fCTD,
-    header = TRUE,
-    colClasses=c(rep("numeric",3)));
-  
-  ret <- c();
-  
-  for (i in 1:nrow(df.ctd)){
-    
-    #create transect object
-    ret <- c(ret,
-             ctdstation(lat=df.ctd$Lat[i],
-                        lon=df.ctd$Lon[i],
-                        code=as.character(df.ctd$Station[i]),
-                        cruise_code=CruiseCode));
-  }
-  
-  names(ret) <- df.ctd$Station;
-  
-  ret;
-  
-}
+  #if DBCTDs is not supplied, read the data from the csv
 
-loadHauls <- function(CruiseCode) {
+  ret <- c()
   
-    ret<-c()
+  if (is.null(DBCTDs)) {
     
-    for (h in 1:nrow(Hauls)){
+    fCTD <- paste("./Data/",CruiseName,"/",CruiseName,"_CTD.csv",sep="")
+  
+    if (!file.exists(fCTD)) {
+      cat("No CTD data file found\n")
+      return(NULL)
+    }
+  
+    #load in CTD information from csv file
+    df.ctd <- read.csv(
+      file = fCTD,
+      header = TRUE,
+      colClasses=c(rep("numeric",3)))
+  
+    for (i in 1:nrow(df.ctd)){
+      
+      #create ctdstation object
+      ret <- c(ret,
+               ctdstation(lat=df.ctd$Lat[i],
+                          lon=df.ctd$Lon[i],
+                          code=as.character(df.ctd$Station[i]),
+                          cruise_code=CruiseCode))
+    }
     
-      #species list
-      spe <- vector("list",length=length(Samples$HaulNo[Samples$HaulNo==Hauls$HaulNo[h]]))
-      names(spe) <- toupper(Samples$SpeciesName[Samples$HaulNo==Hauls$HaulNo[h]])
-      
-      fill <- vector("list",length=9)
-      names(fill) <- c("samp.wgt","sub.samp.wgt","tot.wgt","len.class","num.at.len",
-                       "length","weight","age","maturity")
-      
-      if (length(spe)>0) {
-        
-        for (s in 1:length(spe)){
-          fill$samp.wgt<-Samples$SampleWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
-          fill$sub.samp.wgt<-Samples$SubSampleWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
-          fill$tot.wgt<-Samples$TotalWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
-          fill$len.class<-LF$LengthClass[LF$HaulNo==Hauls$HaulNo[h] & LF$SpeciesName==names(spe)[s]]
-          fill$num.at.len<-LF$SubSampleFrequency[LF$HaulNo==Hauls$HaulNo[h] & LF$SpeciesName==names(spe)[s]]
-          fill$length<-Ages$LenClass[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
-          fill$weight<-Ages$Weight[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
-          fill$age<-Ages$Age[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
-          fill$maturity<-Ages$Maturity[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
-          spe[[s]]<-fill
-        }
-      }      
-      
-      #create new haul object
-#      tmp <- haul(code=as.character(Hauls$HaulNo[h]),
-#                  cruise_code = CruiseCode,
-#                  valid = Hauls$Valid[h],
-#                  shoot_wp = waypoint(Hauls$ShotLat[h],Hauls$ShotLon[h],Hauls$ShotDateTime[h]),
-#                  haul_wp = waypoint(Hauls$HaulLat[h],Hauls$HaulLon[h],Hauls$HaulDateTime[h]),
-#                  species = spe)
+    names(ret) <- df.ctd$Station
+  
+  } else {
+    
+    for (i in 1:nrow(DBCTDs)){
 
-      #create new haul object
-      tmp <- haul(code=as.character(Hauls$HaulNo[h]),
-                  cruise_code = CruiseCode,
-                  valid = Hauls$Valid[h],
-                  shoot_wp = waypoint(lat=Hauls$ShotLat[h],
-                                      lon=Hauls$ShotLon[h],
-                                      time=as.POSIXlt(strptime(Hauls$ShotDateTime[h],"%d/%m/%Y %H:%M"))),
-                  haul_wp = waypoint(lat=Hauls$HaulLat[h],
-                                     lon=Hauls$HaulLon[h],
-                                     time=as.POSIXlt(strptime(Hauls$HaulDateTime[h],"%d/%m/%Y %H:%M"))),
-                  species = spe)
-      
-      ret<-c(ret,tmp)
-      #ret[h] <- tmp
+      #create ctdstation object
+      ret <- c(ret,
+               ctdstation(lat = {if (DBCTDs$Lat_Deg[i]>0) {DBCTDs$Lat_Deg[i] + DBCTDs$Lat_Min[i]/60} else {DBCTDs$Lat_Deg[i] - DBCTDs$Lat_Min[i]/60}},
+                          lon = {if (DBCTDs$Lon_Deg[i]>0) {DBCTDs$Lon_Deg[i] + DBCTDs$Lon_Min[i]/60} else {DBCTDs$Lon_Deg[i] - DBCTDs$Lon_Min[i]/60}},
+                          code = as.character(DBCTDs$CTD[i]),
+                          cruise_code = CruiseCode))
       
     }
     
-    names(ret)<-unlist(lapply(ret,getCode))
+  }
+  
+  ret
+  
+}
+
+fLoad_Hauls <- function(CruiseCode) {
+  
+    ret<-c()
+
+    if (exists("Hauls")) {
+      
+      for (h in 1:nrow(Hauls)){
+      
+        #species list
+        spe <- vector("list",length=length(Samples$HaulNo[Samples$HaulNo==Hauls$HaulNo[h]]))
+        names(spe) <- toupper(Samples$SpeciesName[Samples$HaulNo==Hauls$HaulNo[h]])
+        
+        fill <- vector("list",length=9)
+        names(fill) <- c("samp.wgt","sub.samp.wgt","tot.wgt","len.class","num.at.len",
+                         "length","weight","age","maturity")
+        
+        if (length(spe)>0) {
+          
+          for (s in 1:length(spe)){
+            fill$samp.wgt<-Samples$SampleWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
+            fill$sub.samp.wgt<-Samples$SubSampleWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
+            fill$tot.wgt<-Samples$TotalWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
+            fill$len.class<-LF$LengthClass[LF$HaulNo==Hauls$HaulNo[h] & LF$SpeciesName==names(spe)[s]]
+            fill$num.at.len<-LF$SubSampleFrequency[LF$HaulNo==Hauls$HaulNo[h] & LF$SpeciesName==names(spe)[s]]
+            fill$length<-Ages$LenClass[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
+            fill$weight<-Ages$Weight[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
+            fill$age<-Ages$Age[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
+            fill$maturity<-Ages$Maturity[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
+            spe[[s]]<-fill
+          }
+        }      
+        
+        #create new haul object
+  #      tmp <- haul(code=as.character(Hauls$HaulNo[h]),
+  #                  cruise_code = CruiseCode,
+  #                  valid = Hauls$Valid[h],
+  #                  shoot_wp = waypoint(Hauls$ShotLat[h],Hauls$ShotLon[h],Hauls$ShotDateTime[h]),
+  #                  haul_wp = waypoint(Hauls$HaulLat[h],Hauls$HaulLon[h],Hauls$HaulDateTime[h]),
+  #                  species = spe)
+  
+        #create new haul object
+        tmp <- haul(code=as.character(Hauls$HaulNo[h]),
+                    cruise_code = CruiseCode,
+                    valid = Hauls$Valid[h],
+                    shoot_wp = waypoint(lat=Hauls$ShotLat[h],
+                                        lon=Hauls$ShotLon[h],
+                                        time=as.POSIXlt(strptime(Hauls$ShotDateTime[h],"%d/%m/%Y %H:%M"))),
+                    haul_wp = waypoint(lat=Hauls$HaulLat[h],
+                                       lon=Hauls$HaulLon[h],
+                                       time=as.POSIXlt(strptime(Hauls$HaulDateTime[h],"%d/%m/%Y %H:%M"))),
+                    species = spe)
+        
+        ret<-c(ret,tmp)
+        #ret[h] <- tmp
+        
+      }
+      
+      names(ret)<-unlist(lapply(ret,getCode))
+
+    }
     
     ret
     
@@ -619,100 +642,134 @@ loadHauls <- function(CruiseCode) {
 }
 
 
-loadTransects <- function(CruiseCode,CruiseName){
+fLoad_Transects <- function(CruiseCode, CruiseName, DBTransects=NULL) {
   
-#   df.tran <- read.csv(
-#     file = paste("./Data/",CruiseName,"/",CruiseName,"_Transect_S_E.csv",sep=""),
-#     header = TRUE,
-#     colClasses=c(rep("character",4),
-#                  rep("numeric",4),
-#                  rep("character",2),
-#                  rep("numeric",4)));
+  #if DBTransects is not supplied, read the data from the csv
 
-  df.tran <- read.csv(
-    file = paste("./Data/",CruiseName,"/",CruiseName,"_Transect.csv",sep=""),
-    header = TRUE,
-    colClasses=c(rep("character",4),
-                 rep("numeric",2),
-                 rep("character",2),
-                 rep("numeric",2)));
+  ret <- c()
   
-  ret <- c();
-  
-  for (i in 1:nrow(df.tran)){
-    
-    #start time
-    st.time <- as.POSIXlt(strptime(paste(df.tran$S_Date[i],df.tran$S_Time[i],sep=" "),"%d/%m/%Y %H:%M"));
-    #end time
-    end.time <- as.POSIXlt(strptime(paste(df.tran$E_Date[i],df.tran$E_Time[i],sep=" "),"%d/%m/%Y %H:%M"));
-    
-    #create transect object
-#     ret <- c(ret,
-#              transect(code = as.character(df.tran$Trans[i]),
-#                       stratum_code = df.tran$Str[i],
-#                       cruise_code = CruiseCode,
-#                       start_pos = geopoint(lat=df.tran$S_LatD[i]+df.tran$S_LatM[i]/60.0,
-#                                            lon=df.tran$S_LonD[i]-df.tran$S_LonM[i]/60.0),
-#                       end_pos = geopoint(lat=df.tran$E_LatD[i]+df.tran$E_LatM[i]/60.0,
-#                                          lon=df.tran$E_LonD[i]-df.tran$E_LonM[i]/60.0),
-#                       start_time = st.time,
-#                       end_time = end.time));
-    
-    ret <- c(ret,
-             transect(code = as.character(df.tran$Trans[i]),
-                      stratum_code = df.tran$Str[i],
-                      cruise_code = CruiseCode,
-                      start_pos = geopoint(lat=df.tran$S_Lat[i],lon=df.tran$S_Lon[i]),
-                      end_pos = geopoint(lat=df.tran$E_Lat[i],lon=df.tran$E_Lon[i]),
-                      start_time = st.time,
-                      end_time = end.time));
-  }
-  
-  names(ret) <- df.tran$Trans;
-  
-  return(ret);
-  
-}
+  if (is.null(DBTransects)) {
 
-loadStrata <- function(CruiseCode,CruiseName){
-  
-#   df.strata <- read.csv(
-#     file = paste("./Data/",CruiseName,"/",CruiseName,"_Strata.csv",sep=""),
-#     header = TRUE,
-#     colClasses=c(rep("character",3),
-#                  rep("numeric",2),
-#                  rep("character",1)));
-
-  df.strata <- read.csv(
-    file = paste("./Data/",CruiseName,"/",CruiseName,"_Strata.csv",sep=""),
-    header = TRUE,
-    colClasses=c(rep("character",3),
-                 rep("numeric",2)));
-  
-  ret <- c();
-  
-  #unique strata codes
-  stratacodes <- unique(df.strata$Stratum);
-  
-  for (i in 1:length(stratacodes)){
+    df.tran <- read.csv(
+      file = paste("./Data/",CruiseName,"/",CruiseName,"_Transect.csv",sep=""),
+      header = TRUE,
+      colClasses=c(rep("character",4),
+                   rep("numeric",2),
+                   rep("character",2),
+                   rep("numeric",2)))
     
-    ret <- c(ret,
-             stratum(code = stratacodes[i],
-                     cruise_code = CruiseCode,
-                     type = "TO DO",
-                     boundary_lat = df.strata$Lat[df.strata$Stratum == stratacodes[i]],
-                     boundary_lon = df.strata$Lon[df.strata$Stratum == stratacodes[i]],
-                     ICESarea = unique(df.strata$ICES[df.strata$Stratum == stratacodes[i]]))
-    );
+    for (i in 1:nrow(df.tran)){
+      
+      #start time
+      st.time <- as.POSIXlt(strptime(paste(df.tran$S_Date[i],df.tran$S_Time[i],sep=" "),"%d/%m/%Y %H:%M"))
+      #end time
+      end.time <- as.POSIXlt(strptime(paste(df.tran$E_Date[i],df.tran$E_Time[i],sep=" "),"%d/%m/%Y %H:%M"))
+      
+      #create transect object
+      ret <- c(ret,
+               transect(code = as.character(df.tran$Trans[i]),
+                        stratum_code = df.tran$Str[i],
+                        cruise_code = CruiseCode,
+                        start_pos = geopoint(lat=df.tran$S_Lat[i],lon=df.tran$S_Lon[i]),
+                        end_pos = geopoint(lat=df.tran$E_Lat[i],lon=df.tran$E_Lon[i]),
+                        start_time = st.time,
+                        end_time = end.time))
+    }
+    
+    names(ret) <- df.tran$Trans
+  
+  } else {
+    
+    #use DBTransects object
+    for (i in 1:nrow(DBTransects)){
+
+      #start time
+      st.time <- as.POSIXlt(strptime(paste(levels(DBTransects$Start_Date)[DBTransects$Start_Date[i]],levels(DBTransects$Start_Time)[DBTransects$Start_Time[i]],sep=" "),"%d/%m/%Y %H:%M"))
+      #end time
+      end.time <- as.POSIXlt(strptime(paste(levels(DBTransects$End_Date)[DBTransects$End_Date[i]],levels(DBTransects$End_Date)[DBTransects$End_Date[i]],sep=" "),"%d/%m/%Y %H:%M"))
+
+      #create transect object
+       ret <- c(ret,
+                transect(code = as.character(DBTransects$Transect[i]),
+                         stratum_code = levels(DBTransects$Stratum)[DBTransects$Stratum[i]],
+                         cruise_code = CruiseCode,
+                         start_pos = geopoint(lat = {if (DBTransects$Start_Lat_Deg[i]>0){DBTransects$Start_Lat_Deg[i] + DBTransects$Start_Lat_Min[i]/60} else {DBTransects$Start_Lat_Deg[i] - DBTransects$Start_Lat_Min[i]/60}},
+                                              lon = {if (DBTransects$Start_Lon_Deg[i]>0){DBTransects$Start_Lon_Deg[i] + DBTransects$Start_Lon_Min[i]/60} else {DBTransects$Start_Lon_Deg[i] - DBTransects$Start_Lon_Min[i]/60}}),
+                         end_pos = geopoint(lat = {if (DBTransects$End_Lat_Deg[i]>0){DBTransects$End_Lat_Deg[i] + DBTransects$End_Lat_Min[i]/60} else {DBTransects$End_Lat_Deg[i] - DBTransects$End_Lat_Min[i]/60}},
+                                            lon = {if (DBTransects$End_Lon_Deg[i]>0){DBTransects$End_Lon_Deg[i] + DBTransects$End_Lon_Min[i]/60} else {DBTransects$End_Lon_Deg[i] - DBTransects$End_Lon_Min[i]/60}}),
+                         start_time = st.time,
+                         end_time = end.time))
+    }
+    
+    names(ret) <- DBTransects$Transect
     
   }
   
-  names(ret) <- stratacodes;
-  return(ret);
+  return(ret)
   
 }
 
-loadSpeciesDetails <- function(CruiseCode){
+
+fLoad_Strata <- function(CruiseCode, CruiseName, DBStrata=NULL){
+
+  if (is.null(DBStrata)) {
+
+    df.strata <- read.csv(
+      file = paste("./Data/",CruiseName,"/",CruiseName,"_Strata.csv",sep=""),
+      header = TRUE,
+      colClasses=c(rep("character",3),
+                   rep("numeric",2)))
+    
+    ret <- c()
+    
+    #unique strata codes
+    stratacodes <- unique(df.strata$Stratum)
+    
+    for (i in 1:length(stratacodes)){
+      
+      ret <- c(ret,
+               stratum(code = stratacodes[i],
+                       cruise_code = CruiseCode,
+                       type = "TO DO",
+                       boundary_lat = df.strata$Lat[df.strata$Stratum == stratacodes[i]],
+                       boundary_lon = df.strata$Lon[df.strata$Stratum == stratacodes[i]],
+                       ICESarea = unique(df.strata$ICES[df.strata$Stratum == stratacodes[i]]))
+      )
+      
+    }
+    
+    names(ret) <- stratacodes
+  
+  } else {
+
+    ret <- c()
+    
+    #unique strata codes
+    stratacodes <- unique(DBStrata$Stratum)
+    stratacodes <- levels(stratacodes)[stratacodes]
+    
+    for (i in 1:length(stratacodes)){
+      #create transect object
+      ret <- c(ret,
+               stratum(code = stratacodes[i],
+                       cruise_code = CruiseCode,
+                       type = "TO DO",
+                       boundary_lat = DBStrata[DBStrata$Stratum==as.character(stratacodes[i]),]$Lat,
+                       boundary_lon = DBStrata[DBStrata$Stratum==as.character(stratacodes[i]),]$Lon,
+                       ICESarea = unique(levels(DBStrata[DBStrata$Stratum==as.character(stratacodes[i]),]$ICES)[DBStrata[DBStrata$Stratum==as.character(stratacodes[i]),]$ICES])
+               ))
+    }
+
+    names(ret) <- stratacodes
+    
+
+  }
+  
+  return(ret)
+  
+}
+
+fLoad_Species_Details <- function(CruiseCode){
 
   ret <-
     list(
@@ -738,8 +795,8 @@ loadSpeciesDetails <- function(CruiseCode){
                                  est_by_mat=FALSE),
       "Boarfish" = targetspecies(species="Capros aper",common_name="Boarfish",LF_bin_size=0.5,
                                  imm_codes=c("Immature"),mat_codes=c("Mature"),spt_codes=c("Spent"),
-                                 ts_a=20,ts_b=-66.2,ts_LFint=0.5,est_abd=FALSE,est_by_age=FALSE,
-                                 est_by_mat=FALSE),
+                                 ts_a=20,ts_b=-66.2,ts_LFint=0.5,est_abd=TRUE,est_by_age=TRUE,
+                                 est_by_mat=TRUE),
       "Whiting" = targetspecies(species="Merlangus merlangus",common_name="Whiting",LF_bin_size=1,
                                 imm_codes="",mat_codes="",spt_codes="",
                                 ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
@@ -776,7 +833,7 @@ loadSpeciesDetails <- function(CruiseCode){
                                  imm_codes="",mat_codes="",spt_codes="",
                                  ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
                                  est_by_mat=FALSE),
-      "Poor Code" = targetspecies(species="TRISOPTERUS MINUTUS",common_name="Poor Cod",LF_bin_size=1.0,
+      "Poor Cod" = targetspecies(species="TRISOPTERUS MINUTUS",common_name="Poor Cod",LF_bin_size=1.0,
                                        imm_codes="",mat_codes="",spt_codes="",
                                        ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
                                        est_by_mat=FALSE),
@@ -784,17 +841,17 @@ loadSpeciesDetails <- function(CruiseCode){
                                   imm_codes="",mat_codes="",spt_codes="",
                                   ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
                                   est_by_mat=FALSE),
-      "Blue Whiting" = targetspecies(species="MICROMESISTIUS POUTASSOU",common_name="Blue Whiting",LF_bin_size=1,
-                                imm_codes="",mat_codes="",spt_codes="",
-                                ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
-                                est_by_mat=FALSE),
+      "Blue whiting" = targetspecies(species="MICROMESISTIUS POUTASSOU",common_name="Blue Whiting",LF_bin_size=0.5,
+                                     ts_a=20,ts_b=-65.2,ts_LFint=0.5,imm_codes = "Immature",
+                                     mat_codes = "Mature", spt_codes = "Spent",
+                                     est_abd=TRUE,est_by_age=TRUE,est_by_mat=TRUE),
       "Squid" = targetspecies(species="ALL SQUID",common_name="Squid",LF_bin_size=1,
                                      imm_codes="",mat_codes="",spt_codes="",
                                      ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
                                      est_by_mat=FALSE)
     )
   
-  
+    
   #for Boarfish surveys make boarfish the estimated species
   if (CruiseCode=='BFAS2013') {
     ret[['Herring']]@est_abd=FALSE
@@ -877,7 +934,8 @@ AreaLongLat<-function(Long,Lat){
 }
 
 
-ToKm<-function(Pt1y,Pt1x,Pt2y,Pt2x){
+fTo_Km<-function(Pt1y,Pt1x,Pt2y,Pt2x){
+  
   #Pt=c(-Lat,Long)
   # converts 2 -lat,longs into a km dist.
   #  1.852 km/nmile
@@ -1205,7 +1263,9 @@ writeOPLine <- function(x,file,append=TRUE){
   write(x,file,append=append)
 }
 
-formatOPLine <- function(x,ages,numfmt,subzero,tex=FALSE,total=TRUE,colCount,skipb4Total=0){
+fFormat_OPLine <- function(x, ages, numfmt, subzero, tex = FALSE, total = TRUE,
+                         colCount, skipb4Total = 0){
+  
   #format a line of output based on the required ages
   #if tex = TRUE the line is for inclusion in a TEX table,
   #otherwise it's a tab separated string
@@ -1219,13 +1279,21 @@ formatOPLine <- function(x,ages,numfmt,subzero,tex=FALSE,total=TRUE,colCount,ski
   tot <- 0
   
   for (a in ages){
-    if (!is.null(x[as.character(a)])) {
-      if (!is.na(x[as.character(a)])) {
-        tot <- tot + x[as.character(a)]
-        if ((x[as.character(a)]==0) & (!missing(subzero))) {
-          ret <- paste(ret,subzero,sep=",")
+    if (as.character(a) %in% names(x)) {
+      if (!is.null(x[as.character(a)])) {
+        if (!is.na(x[as.character(a)])) {
+          tot <- tot + x[as.character(a)]
+          if ((x[as.character(a)]==0) & (!missing(subzero))) {
+            ret <- paste(ret,subzero,sep=",")
+          } else {
+            ret <- paste(ret,sprintf(numfmt,x[as.character(a)]),sep=",")
+          }
         } else {
-          ret <- paste(ret,sprintf(numfmt,x[as.character(a)]),sep=",")
+          if (!missing(subzero)) {
+            ret <- paste(ret,subzero,sep=",")
+          } else {
+            ret <- paste(ret,sprintf(numfmt,0),sep=",")
+          }
         }
       } else {
         if (!missing(subzero)) {
@@ -1241,6 +1309,7 @@ formatOPLine <- function(x,ages,numfmt,subzero,tex=FALSE,total=TRUE,colCount,ski
         ret <- paste(ret,sprintf(numfmt,0),sep=",")
       }
     }
+    
   }
   
   #add total
@@ -1269,53 +1338,53 @@ formatOPLine <- function(x,ages,numfmt,subzero,tex=FALSE,total=TRUE,colCount,ski
   
 }
 
-combineLFs <- function(lIn){
+fCombine_LFs <- function(lIn, offset=NULL){
   
   #combine a number of length frequencies
   #input is a list
   
   #remove any NULLs
-  t<-Filter(Negate(is.null),lIn)
+  t <- Filter(Negate(is.null),lIn)
   
-  #vector of lengths
-  len <-  sort(unique(unlist(lapply(t,names))))
-  
-  #cat(len,"\n")
+  #vector of categories (lengths/ maturity stages/ maturities)
+  cat <-  sort(unique(unlist(lapply(t,names))))
   
   #create return object
-  ret <- vector("numeric",length=length(len))
-  ret <- rep(0,length(len))
-  names(ret) <- len
+  ret <- vector("numeric",length=length(cat))
+  ret <- rep(0,length(cat))
+  names(ret) <- cat
 
-  #loop over LFs, accumulating the summed values in ret
+  #loop over categories, accumulating the summed values in ret
   for (i in 1:length(t)){
     
     LF <- t[[i]]
     
-    #cat(LF,"\n")
-    
     for (j in 1:length(LF)){
       ret[[names(LF)[j]]] <- ret[[names(LF)[j]]] + LF[j]
     }
+    
   } 
   
-  #adjust lengths by 0.25
-  unadjusted <- as.numeric(names(ret))
-  adjusted <- unadjusted - 0.25
-  
-  names(ret) <- adjusted
+  #apply offset if supplied (for Length categories)
+  if (!is.null(offset)) {
+    #adjust lengths by offset
+    unadjusted <- as.numeric(names(ret))
+    adjusted <- unadjusted + offset
+    names(ret) <- adjusted
+  }
   
   ret
   
 }
 
-aggregateSA <- function(SA,MarkTypes) {
+fAggregate_SA <- function(SA, MarkTypes) {
   
   #SA - the raw SA data
+  if (is.null(SA)) return(c())
   
   #calculate the mid position of mark
-  SA$Mid.Lat <- (SA$Lat_S + SA$Lat_E)/2;
-  SA$Mid.Lon <- (SA$Lon_S + SA$Lon_E)/2;
+  SA$Mid.Lat <- (SA$Lat_S + SA$Lat_E)/2
+  SA$Mid.Lon <- (SA$Lon_S + SA$Lon_E)/2
   
   #calculate the school length
   if(nrow(SA)>0) {
@@ -1323,26 +1392,26 @@ aggregateSA <- function(SA,MarkTypes) {
     for (i in 1:nrow(SA)) {
       
       #Ian Doonan's distance function
-      SA$SchoolLength[i] <- ToKm(SA$Lat_S[i],SA$Lon_S[i],SA$Lat_E[i],SA$Lon_E[i]);
+      SA$SchoolLength[i] <- fTo_Km(SA$Lat_S[i], SA$Lon_S[i], SA$Lat_E[i], SA$Lon_E[i])
       
       #SA$SchoolLength[i] <- distVincentyEllipsoid(c(SA$Lon_S[i],SA$Lat_S[i]),
-      #                                            c(SA$Lon_E[i],SA$Lat_E[i]))/1000;
+      #                                            c(SA$Lon_E[i],SA$Lat_E[i]))/1000
       
-      SA$Tx[i] <- 1;
+      SA$Tx[i] <- 1
     }
   }
   
   #unique mark types
-  MTs <- unique(SA$Region_class);
+  MTs <- unique(SA$Region_class)
   
   #return data
-  ret <- c();
+  ret <- c()
   
   #loop over mark types
   for (j in 1:(length(levels(MTs)))) {
     
     #subset for this mark type
-    SA_MT <- subset(SA,SA$Region_class == levels(MTs)[j]);
+    SA_MT <- subset(SA,SA$Region_class == levels(MTs)[j])
     
     #assemble a data frame... (converting school length to nmi)
     dfSA <- data.frame(Strata = SA_MT$Strata,
@@ -1352,7 +1421,7 @@ aggregateSA <- function(SA,MarkTypes) {
                        SA = SA_MT$PRC_NASC,
                        Lat = SA_MT$Mid.Lat,
                        Lon = SA_MT$Mid.Lon,
-                       School.Length = SA_MT$SchoolLength/1.852);
+                       School.Length = SA_MT$SchoolLength/1.852)
     
     #and aggregate SA values for the same schools
     dfSA.agg <- aggregate(dfSA$SA,by=list(dfSA$Strata,
@@ -1361,13 +1430,13 @@ aggregateSA <- function(SA,MarkTypes) {
                                           dfSA$Date,
                                           dfSA$Lat,
                                           dfSA$Lon,
-                                          dfSA$School.Length),FUN=sum);
+                                          dfSA$School.Length),FUN=sum)
     
     #assign names
-    names(dfSA.agg)<-c("Strata","Transect","Time","Date","Lat","Lon","School.Length","SA");
+    names(dfSA.agg)<-c("Strata","Transect","Time","Date","Lat","Lon","School.Length","SA")
     
     #preallocate a list of length nrow(dfSA.agg)
-    lSA <- vector("list",nrow(dfSA.agg));
+    lSA <- vector("list",nrow(dfSA.agg))
     
     for (i in 1:nrow(dfSA.agg)){
       
@@ -1385,7 +1454,7 @@ aggregateSA <- function(SA,MarkTypes) {
     }
     
     #append to return object
-    ret <- c(ret,lSA);
+    ret <- c(ret,lSA)
     
     
   }

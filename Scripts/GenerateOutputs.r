@@ -65,7 +65,7 @@ if (getEstByAge(Species[[Estspecies]])) {
   #CVs
   AbdAtAge[['CV']] <- CVatAge
   
-  if (substring(cruiseName,1,4)=="BFAS") {
+  if (substring(cruiseName,1,4)=="BFAS" | substring(cruiseName,1,10)=="COM01_2011") {
     #Boarfish summaries
     cat(" \n")
   } else if (substring(cruiseName,1,5)=="NWHAS") {
@@ -89,7 +89,7 @@ if (getEstByAge(Species[[Estspecies]])) {
     cat("\n")
   }
   
-  op<-lapply(AbdAtAge,formatOPLine,ages=rep.Ages,numfmt="%.2f")
+  op<-lapply(AbdAtAge,fFormat_OPLine,ages=rep.Ages,numfmt="%.2f")
   #the total column for the CV should be the CV assocated with the survey abundance (CVAbdSur)
   op[['CV']]<-sub(rev(unlist(strsplit(op[['CV']],",")))[1],CVAbdSur,op[['CV']])
   
@@ -113,7 +113,7 @@ if (getEstByAge(Species[[Estspecies]])) {
   #percentages
   BioAtAge[['%']] <- 100.0*BioAtAge[['Total']]/sum(BioAtAge[['Total']])
   
-  if (substring(cruiseName,1,4)=="BFAS") {
+  if (substring(cruiseName,1,4)=="BFAS" | substring(cruiseName,1,10)=="COM01_2011") {
     #Boarfish summaries
     cat(" \n")
   } else if (substring(cruiseName,1,5)=="NWHAS") {
@@ -135,7 +135,7 @@ if (getEstByAge(Species[[Estspecies]])) {
     cat("\n")
   }
   
-  op<-lapply(BioAtAge,formatOPLine,ages=rep.Ages,numfmt="%.1f")
+  op<-lapply(BioAtAge,fFormat_OPLine,ages=rep.Ages,numfmt="%.1f")
   #add name to start of list
   for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
   #write header
@@ -151,7 +151,7 @@ if (getEstByAge(Species[[Estspecies]])) {
 if (getEstByMat(Species[[Estspecies]])) {
   
   #no groups specified for boarfish as maturity key was input separately
-  if (substring(cruiseName,1,4)=="BFAS") {
+  if (substring(cruiseName,1,4)=="BFAS" | substring(cruiseName,1,10)=="COM01_2011") {
   
     AbdAtMat <- lapply(Strata,getAbdAtMat,marktypes=rep.MTs)
   
@@ -200,9 +200,21 @@ if (getEstByMat(Species[[Estspecies]])) {
     #percentages
     AbdAtMat[['%']] <- 100.0*AbdAtMat[['Total']]/sum(AbdAtMat[['Total']])
     
+  } else if (substring(cruiseName,1,4)=="BWAS" | substring(cruiseName,1,10)=="COM01_2011"){
+
+#    AbdAtMat <- lapply(Strata,getAbdAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+#                                                                           "Mature"=getMatureCodes(Species[[Estspecies]]),
+#                                                                           "Spent"=getSpentCodes(Species[[Estspecies]])))
+
+    AbdAtMat <- lapply(Strata,getAbdAtMat,marktypes=rep.MTs)
+    #total
+    AbdAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),AbdAtMat))
+    #percentages
+    AbdAtMat[['%']] <- 100.0*AbdAtMat[['Total']]/sum(AbdAtMat[['Total']])
+    
   }
   
-  op<-lapply(AbdAtMat,formatOPLine,ages=c("Immature","Mature","Spent"),numfmt="%.2f")
+  op<-lapply(AbdAtMat,fFormat_OPLine,ages=c("Immature","Mature","Spent"),numfmt="%.2f")
   #add name to start of list
   for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
   #write header
@@ -219,7 +231,7 @@ if (getEstByMat(Species[[Estspecies]])) {
 if (getEstByAge(Species[[Estspecies]])) {
   
   #no groups specified for boarfish as maturity key was input separately
-  if (substring(cruiseName,1,4)=="BFAS") {
+  if (substring(cruiseName,1,4)=="BFAS" | substring(cruiseName,1,10)=="COM01_2011") {
     
     BioAtMat <- lapply(Strata,getBioAtMat,marktypes=rep.MTs)
   
@@ -269,9 +281,23 @@ if (getEstByAge(Species[[Estspecies]])) {
     #percentages
     BioAtMat[['%']] <- 100.0*BioAtMat[['Total']]/sum(BioAtMat[['Total']])
     
+  } else if (substring(cruiseName,1,4)=="BWAS") { 
+    
+#    BioAtMat <- lapply(Strata,getBioAtMat,marktypes=rep.MTs,matgroups=list("Immature"=getImmatureCodes(Species[[Estspecies]]),
+#                                                                           "Mature"=getMatureCodes(Species[[Estspecies]]),
+#                                                                           "Spent"=getSpentCodes(Species[[Estspecies]])))
+ 
+    BioAtMat <- lapply(Strata,getBioAtMat,marktypes=rep.MTs)
+    
+    #total
+    BioAtMat[['Total']] <- Reduce("+",Filter(Negate(is.null),BioAtMat))
+    #percentages
+    BioAtMat[['%']] <- 100.0*BioAtMat[['Total']]/sum(BioAtMat[['Total']])
+    
   }
   
-  op<-lapply(BioAtMat,formatOPLine,ages=c("Immature","Mature","Spent"),numfmt="%.1f")
+  op <- lapply(BioAtMat, fFormat_OPLine, ages=c("Immature","Mature","Spent"), numfmt="%.1f")
+  
   #add name to start of list
   for (i in 1:length(op)){op[[i]]<-paste(names(op)[i],op[[i]],sep="")}
   #write header
@@ -331,12 +357,17 @@ lapply(op,writeOPLine,file=paste(tables.dir,"HaulComp.csv",sep=""))
 
 #Abundance at Age as abundance and biomass
 #----------------------------------------------------------------------
-if (getEstByAge(Species[[Estspecies]])) {  
-  AbdAtLen <- combineLFs(lapply(Strata,getAbdAtLen,marktypes=rep.MTs))
-  AbdAtMat <- combineLFs(lapply(Strata,getAbdAtMat,marktypes=rep.MTs))
+if (getEstByAge(Species[[Estspecies]])) {
+  
+  #abundance by length class
+  AbdAtLen <- fCombine_LFs(lapply(Strata,getAbdAtLen,marktypes=rep.MTs), offset=-.25)
+  #abundance by maturity stage
+  AbdAtMat <- fCombine_LFs(lapply(Strata,getAbdAtMat,marktypes=rep.MTs))
+  
   LenAtAge <- lapply(seq_along(AbdAtLen),function(i) AbdAtLen[i]*ALK[names(AbdAtLen)[i],])
+  
   names(LenAtAge) <- names(AbdAtLen)
-  op<-lapply(LenAtAge,formatOPLine,ages=rep.Ages,numfmt="%.2f",subzero="-")
+  op <- lapply(LenAtAge, fFormat_OPLine, ages = rep.Ages, numfmt = "%.2f", subzero = "-")
 
   #biomass at length
   BioAtLen <- combineLFs(lapply(Strata,getBioAtLen,marktypes=rep.MTs))
@@ -361,13 +392,13 @@ if (getEstByAge(Species[[Estspecies]])) {
 
   #total abundance at age
   TotAbdAtAge <- Reduce("+",Filter(Negate(is.null),lapply(Strata,getAbdAtAge,marktypes=rep.MTs)))
-  writeOPLine(paste("Abd",formatOPLine(TotAbdAtAge,ages = rep.Ages,numfmt = "%.2f",
+  writeOPLine(paste("Abd",fFormat_OPLine(TotAbdAtAge,ages = rep.Ages,numfmt = "%.2f",
                                        subzero = "-",colCount = length(unlist(strsplit(headers[7],",")))),
                     sep=""),file = paste(tables.dir,"LenAtAge.csv",sep=""))
   
   #total biomass at age
   TotBioAtAge <- Reduce("+",Filter(Negate(is.null),lapply(Strata,getBioAtAge,marktypes=rep.MTs)))
-  writeOPLine(paste("Biomass",formatOPLine(TotBioAtAge,ages = rep.Ages,numfmt = "%.2f",
+  writeOPLine(paste("Biomass",fFormat_OPLine(TotBioAtAge,ages = rep.Ages,numfmt = "%.2f",
                                            subzero = "-",colCount = length(unlist(strsplit(headers[7],","))),
                                            skipb4Total=1),
                     sep=""),file = paste(tables.dir,"LenAtAge.csv",sep=""))
@@ -385,17 +416,18 @@ if (getEstByAge(Species[[Estspecies]])) {
     }
   }
 
-  writeOPLine(paste("Mean Wgt",formatOPLine(MnWgtAtAge,ages = rep.Ages,numfmt = "%.1f",
+  writeOPLine(paste("Mean Wgt",fFormat_OPLine(MnWgtAtAge,ages = rep.Ages,numfmt = "%.1f",
                                            subzero = "-",total = FALSE, 
                                            colCount = length(unlist(strsplit(headers[7],",")))),
                     sep=""),file = paste(tables.dir,"LenAtAge.csv",sep=""))
     
-  writeOPLine(paste("Mean Len",formatOPLine(MnLenAtAge,ages = rep.Ages,numfmt = "%.1f",
+  writeOPLine(paste("Mean Len",fFormat_OPLine(MnLenAtAge,ages = rep.Ages,numfmt = "%.1f",
                                             subzero = "-",total = FALSE, 
                                             colCount = length(unlist(strsplit(headers[7],",")))),
                     sep=""),file = paste(tables.dir,"LenAtAge.csv",sep=""))
   
 }
+
 
 #11/10/2014
 #summary by mark type
