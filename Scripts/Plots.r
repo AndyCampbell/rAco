@@ -1,7 +1,7 @@
 #Acoustic Analysis plots
 
 #mark types to include (for SA data)
-mt<-lapply(MarkTypes,getNASCName)
+mt <- lapply(MarkTypes,getNASCName)
 
 #plot Cruise
 plot(Cruise,
@@ -37,19 +37,19 @@ for (p in 1:length(mt)){
   f.op <- paste(plots.dir,"//",getName(Cruise),"_",sub(" ","",mt[[p]]),".png",sep="")  
   
   plot(Cruise,
-       transects=Transects,
-       sa=SA[toupper(lapply(SA,getMarkType))==toupper(mt[[p]])],
-       filename=f.op,
-       srboundaries=TRUE,
-       bathycontours=c(250,300,400,500),
-       leg.pos="bottomleft")
+       transects = Transects,
+       sa =  SA[toupper(lapply(SA,getMarkType))==toupper(mt[[p]])],
+       filename = f.op,
+       srboundaries = TRUE,
+       bathycontours = c(250,300,400,500),
+       leg.pos = "bottomleft")
 }
 
 #plot strata
 for(i in 1:length(Strata)) {
   plot(Strata[[i]],
-       filename=paste(plots.dir,"//Strata_",as.character(getCode(Strata[[i]])),".png",sep=""),
+       filename = paste(plots.dir,"//Strata_",as.character(getCode(Strata[[i]])),".png",sep=""),
        transects = Transects,
-       sa=(if (exists("SA")) {SA[which(lapply(SA,getMarkType)%in%unlist(mt))]} else {NULL}),
-       Track=(if (exists("Track")) {Track} else {NULL}));
+       sa = (if (exists("SA")) {SA[which(lapply(SA,getMarkType)%in%unlist(mt))]} else {NULL}),
+       Track = (if (exists("Track")) {Track} else {NULL}));
 }

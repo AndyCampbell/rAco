@@ -4,6 +4,7 @@
 #04/07/2014 V0.4 NWHAS2014 improvements
 #10/11/2014 test with CSHAS2013
 #12/02/2014 moved into github
+#13/11/2015 CSHAS2015
 
 #BEFORE proceeding...
 #ensure the following files are available (in repository)
@@ -23,6 +24,7 @@ source("./Scripts/Init.r")
 
 #load Cruise data file
 
+Cruise <- loadCruise(CruiseName = "CSHAS2015", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "BWAS2015", SpeciesName = "Blue Whiting")
 #Cruise <- loadCruise(CruiseName = "NWHAS2013", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "NWHAS2013", SpeciesName = "Boarfish")
@@ -31,7 +33,7 @@ source("./Scripts/Init.r")
 #Cruise <- loadCruise(CruiseName = "NWHAS2014", SpeciesName = "Sprat")
 #Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Sprat")
-Cruise <- loadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
+#Cruise <- loadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "COM01_2011", SpeciesName = "Boarfish")   #boarfish 2011, excluding midnight-4am
 #Cruise <- loadCruise(CruiseName = "COM02_2011", SpeciesName = "Boarfish")   #boarfish 2011, 24hrs
 
@@ -95,7 +97,7 @@ SA <- fAggregate_SA(SA = {if (exists("SA")){SA}else{NULL}}, MarkTypes = MarkType
 table(unlist(lapply(SA,getMarkType)))
 
 #create plots directory
-plots.dir<-paste(getwd(), "/Plots/", getName(Cruise), "/", getTargetCommon(Cruise), "/", sep="")
+plots.dir <- paste(getwd(), "/Plots/", getName(Cruise), "/", getTargetCommon(Cruise), "/", sep="")
 
 #create the output directory, suppress the showWarnings so that no warning
 #is issued if the folder already exists

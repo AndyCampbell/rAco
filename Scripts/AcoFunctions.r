@@ -662,6 +662,7 @@ fLoad_Transects <- function(CruiseCode, CruiseName, DBTransects=NULL) {
       
       #start time
       st.time <- as.POSIXlt(strptime(paste(df.tran$S_Date[i],df.tran$S_Time[i],sep=" "),"%d/%m/%Y %H:%M"))
+      
       #end time
       end.time <- as.POSIXlt(strptime(paste(df.tran$E_Date[i],df.tran$E_Time[i],sep=" "),"%d/%m/%Y %H:%M"))
       
@@ -684,14 +685,16 @@ fLoad_Transects <- function(CruiseCode, CruiseName, DBTransects=NULL) {
     for (i in 1:nrow(DBTransects)){
 
       #start time
-      st.time <- as.POSIXlt(strptime(paste(levels(DBTransects$Start_Date)[DBTransects$Start_Date[i]],levels(DBTransects$Start_Time)[DBTransects$Start_Time[i]],sep=" "),"%d/%m/%Y %H:%M"))
+      #st.time <- as.POSIXlt(strptime(paste(levels(DBTransects$Start_Date)[DBTransects$Start_Date[i]],levels(DBTransects$Start_Time)[DBTransects$Start_Time[i]],sep=" "),"%d/%m/%Y %H:%M"))
+      st.time <- as.POSIXlt(strptime(paste(DBTransects$Start_Date[i],DBTransects$Start_Time[i],sep=" "),"%d/%m/%Y %H:%M"))
       #end time
-      end.time <- as.POSIXlt(strptime(paste(levels(DBTransects$End_Date)[DBTransects$End_Date[i]],levels(DBTransects$End_Date)[DBTransects$End_Date[i]],sep=" "),"%d/%m/%Y %H:%M"))
+      #end.time <- as.POSIXlt(strptime(paste(levels(DBTransects$End_Date)[DBTransects$End_Date[i]],levels(DBTransects$End_Time)[DBTransects$End_Time[i]],sep=" "),"%d/%m/%Y %H:%M"))
+      end.time <- as.POSIXlt(strptime(paste(DBTransects$End_Date[i],DBTransects$End_Time[i],sep=" "),"%d/%m/%Y %H:%M"))
 
       #create transect object
        ret <- c(ret,
                 transect(code = as.character(DBTransects$Transect[i]),
-                         stratum_code = levels(DBTransects$Stratum)[DBTransects$Stratum[i]],
+                         stratum_code = as.character(DBTransects$Stratum[i]),
                          cruise_code = CruiseCode,
                          start_pos = geopoint(lat = {if (DBTransects$Start_Lat_Deg[i]>0){DBTransects$Start_Lat_Deg[i] + DBTransects$Start_Lat_Min[i]/60} else {DBTransects$Start_Lat_Deg[i] - DBTransects$Start_Lat_Min[i]/60}},
                                               lon = {if (DBTransects$Start_Lon_Deg[i]>0){DBTransects$Start_Lon_Deg[i] + DBTransects$Start_Lon_Min[i]/60} else {DBTransects$Start_Lon_Deg[i] - DBTransects$Start_Lon_Min[i]/60}}),
@@ -746,17 +749,17 @@ fLoad_Strata <- function(CruiseCode, CruiseName, DBStrata=NULL){
     
     #unique strata codes
     stratacodes <- unique(DBStrata$Stratum)
-    stratacodes <- levels(stratacodes)[stratacodes]
+    #stratacodes <- levels(stratacodes)[stratacodes]
     
     for (i in 1:length(stratacodes)){
-      #create transect object
+      #create stratum object
       ret <- c(ret,
-               stratum(code = stratacodes[i],
+               stratum(code = as.character(stratacodes[i]),
                        cruise_code = CruiseCode,
                        type = "TO DO",
                        boundary_lat = DBStrata[DBStrata$Stratum==as.character(stratacodes[i]),]$Lat,
                        boundary_lon = DBStrata[DBStrata$Stratum==as.character(stratacodes[i]),]$Lon,
-                       ICESarea = unique(levels(DBStrata[DBStrata$Stratum==as.character(stratacodes[i]),]$ICES)[DBStrata[DBStrata$Stratum==as.character(stratacodes[i]),]$ICES])
+                       ICESarea = unique(DBStrata[DBStrata$Stratum==as.character(stratacodes[i]),]$ICES)
                ))
     }
 

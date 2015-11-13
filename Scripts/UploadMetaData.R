@@ -18,7 +18,8 @@ gc()
 source("./Scripts/Init.r")
 
 #load Cruise data file
-Cruise <- loadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
+#Cruise <- loadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
+Cruise <- loadCruise(CruiseName = "CSHAS2015", SpeciesName = "Herring")
 summary(Cruise)
 CruiseCode <- getCode(Cruise)
 
