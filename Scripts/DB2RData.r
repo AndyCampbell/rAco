@@ -2,6 +2,7 @@
 #An ODBC driver is required as connection is made using RODBC
 
 library(RODBC)
+library(dplyr)
 
 #clear memory
 rm(list=ls())
@@ -11,8 +12,9 @@ gc()
 source("./Scripts/Init.r")
 
 #load Cruise data file
-Cruise <- loadCruise(CruiseName = "CSHAS2015", SpeciesName = "Herring")
-#Cruise <- loadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
+#Cruise <- loadCruise(CruiseName = "CSHAS2015", SpeciesName = "Herring")
+#Cruise <- loadCruise(CruiseName = "CSHAS2014", SpeciesName = "Herring")
+Cruise <- fLoadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "COM01_2011", SpeciesName = "Boarfish")   #2011 boarfish daylight hours
 #Cruise <- loadCruise(CruiseName = "COM02_2011", SpeciesName = "Boarfish")   #2011 boarfish 24hrs
 
@@ -43,9 +45,18 @@ sql <- paste("SELECT h.HaulNo as HaulNo,h.Validity as Valid,h.ICES_Rectangle as 
              "h.HaulLongitude as HaulLon,h.Shot_Depth as ShotDepth,h.Haul_Depth as HaulDepth,e.Date as ShootDate,",
              "e.Time as ShootTime,e.EndDate as HaulDate,e.EndTime as HaulTime FROM FSS_HAULS h INNER JOIN FSS_EVENTS e ",
              "ON h.haulno = cint(e.eventno) WHERE h.SurveyName = '",
-             CruiseName,"'"," AND e.eventtype = 'Haul' ORDER BY HaulNo",sep="")
+             CruiseCode,"'"," AND e.eventtype = 'Haul' ORDER BY HaulNo",sep="")
 
 Hauls <- sqlQuery(channel,sql);
+
+#additional information stored in table tblHaulinfo
+sql <- paste("SELECT [Haul number] as HaulNo, [Mean depth] as TrawlDepth, [Speed thru water] as TowSpeed, [Marks of wire shot] as Wirelength ",
+             "FROM tblHaulinfo WHERE [Cruise Code] = '",CruiseCode,"'", sep="")
+
+HaulInfo <- sqlQuery(channel,sql);
+
+#join the data sources
+Hauls <- dplyr::inner_join(Hauls, HaulInfo, by="HaulNo")
 
 if (nrow(Hauls)>0) {
   #validity
@@ -64,7 +75,6 @@ if (nrow(Hauls)>0) {
   Hauls$ShotDateTime <- paste(as.character(Hauls$ShootDate)," ",as.character(Hauls$ShootTime),sep="")
   Hauls$HaulDateTime <- paste(as.character(Hauls$HaulDate)," ",as.character(Hauls$HaulTime),sep="")
   
-  
   Hauls$STime <- as.POSIXlt(strptime(Hauls$ShotDateTime,"%d/%m/%Y %H:%M"))
   Hauls$HTime <- as.POSIXlt(strptime(Hauls$HaulDateTime,"%d/%m/%Y %H:%M"))
   Hauls$SLat <- Hauls$ShotLat
@@ -73,7 +83,7 @@ if (nrow(Hauls)>0) {
   Hauls$HLat <- Hauls$HaulLatitude
   Hauls$HLon <- Hauls$HaulLongitude
   Hauls$HLon[Hauls$Haul_E_or_W=="W"] <- -1*Hauls$HLon[Hauls$Haul_E_or_W=="W"]
-  
+
   #cols to drop
   drops <- c("ShotEW","HaulEW","ShootTime","HaulTime","ShootDate","HaulDate","HTime","SLat","SLon")
   Hauls <- Hauls[,!(names(Hauls) %in% drops)]
@@ -83,11 +93,10 @@ if (nrow(Hauls)>0) {
   saved.objs <- c(saved.objs, "Hauls")
 }
 
-    
 #haul samples
 sql <- paste("SELECT HaulNo, [Species name], [Sample Weight], [Sub-Sample Weight], ",
              "[Total Weight] FROM FSS_SAMPLES WHERE SurveyName = '",
-             CruiseName,"'" ," ORDER BY HaulNo",sep="")
+             CruiseCode,"'" ," ORDER BY HaulNo",sep="")
 
 Samples <- sqlQuery(channel,sql)
 
@@ -107,7 +116,7 @@ if (nrow(Samples)>0) {
 #Length-Freq info
 sql <- paste("SELECT HaulNo,[Species name],[Length class],[Sub-sample frequency] ",
              "FROM FSS_LENGTHFREQ WHERE [Sub-sample frequency]>0 AND SurveyName = '",
-             CruiseName,"'"," ORDER BY HaulNo,[Species name],[Length class]",sep="")
+             CruiseCode,"'"," ORDER BY HaulNo,[Species name],[Length class]",sep="")
 
 LF <- sqlQuery(channel,sql)
 
@@ -127,15 +136,26 @@ if (nrow(LF)) {
 sql <- paste("SELECT HaulNo,[Species name],[Index],[Length class],",
              "[Sex],[Gonad maturity],[Total body weight],[Primary age estimate] FROM ",
              "FSS_AGEDFISH WHERE SurveyName = '",
-             CruiseName,"'"," ORDER BY HaulNo,[Species name],[Index]",sep="")
+             CruiseCode,"'"," ORDER BY HaulNo,[Species name],[Index]",sep="")
 
 Ages <- sqlQuery(channel,sql)
 
 if (nrow(Ages)>0) {
   names(Ages) <- c("HaulNo","SpeciesName","Index","LenClass","Sex","Maturity","Weight","Age")
   Ages$SpeciesName <- toupper(Ages$SpeciesName)
+  
   #change SCOMBERUS SCOMBRUS to SCOMBER SCOMBRUS
   Ages$SpeciesName[Ages$SpeciesName=='SCOMBERUS SCOMBRUS']<-'SCOMBER SCOMBRUS'
+  
+  #Sex of f or F is set to 1
+  #Sex of m or M is set to 2
+  #Sex of i or I is set to 0
+  Ages$Sex <- as.character(Ages$Sex)
+  Ages$Sex[toupper(Ages$Sex)=="F"] <- '1'
+  Ages$Sex[toupper(Ages$Sex)=="M"] <- '2'
+  Ages$Sex[toupper(Ages$Sex)=="I"] <- '0'
+  
+  Ages$Sex <- as.integer(Ages$Sex)
   
   head(Ages)
   
@@ -179,7 +199,7 @@ sql <- paste0("SELECT CTD, CTD_Date, CTD_Time, Depth, Lat_Deg, Lat_Min,",
               "Lon_Deg, Lon_Min FROM FSS_CTD WHERE Survey_Code = '",
               CruiseCode,"' ORDER BY CTD")
 
-DBCTDs <- sqlQuery(channel,sql)
+DBCTDs <- sqlQuery(channel,sql,stringsAsFactors=FALSE)
 
 if (!is.null(nrow(DBCTDs))) {
   if (nrow(DBCTDs)>0){saved.objs <- c(saved.objs, "DBCTDs")}

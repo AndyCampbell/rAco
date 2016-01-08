@@ -5,6 +5,8 @@
 library(sp);
 #spherical trigonometry
 library(geosphere);
+#date manipulation
+library(lubridate)
 
 #source class definitions/ functions
 #source(".//Source//Geography.r"); - use functions in geosphere package instead

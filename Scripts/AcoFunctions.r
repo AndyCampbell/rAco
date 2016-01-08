@@ -1,9 +1,516 @@
 #Acoustic Analysis Functions
 
-# Acoustic Cruise CTD/Haul/Transect/Strata Data file.
-# This will be replaced when the data is read in from DB/text files
+# a function for importing by transect
+import.csvs <- function(Transect, Files, ipdir){
+  
+  base <- paste("T", Transect," ", sep = "")
+  Files <- Files[grep(base, Files)]
+  
+  if(length(Files) != 4) { return ("Error in number of files")} else {
+    import <- list()
+    import$cells     <- read.csv(file=paste0(ipdir,Files[grep("(cells)", Files)]), stringsAsFactors=F)
+    import$analysis  <- read.csv(file=paste0(ipdir,Files[grep("(analysis)", Files)]), stringsAsFactors=F)
+    import$intervals <- read.csv(file=paste0(ipdir,Files[grep("(intervals)", Files)]), stringsAsFactors=F)
+    import$layers    <- read.csv(file=paste0(ipdir,Files[grep("(layers)", Files)]), stringsAsFactors=F)
+    
+    #correcting first column names of imported tables
+    #sometimes, depending on the coding (Unicode UTF-8 BOM), "ï.." can precede the first colname
+    if(substr(colnames(import$cells)[1],2,3) == "..") colnames(import$cells)[1] <- substr(colnames(import$cells)[1], 4 , nchar(colnames(import$cells)[1]))
+    if(substr(colnames(import$analysis)[1],2,3) == "..") colnames(import$analysis)[1] <- substr(colnames(import$analysis)[1], 4 , nchar(colnames(import$analysis)[1]))
+    if(substr(colnames(import$intervals)[1],2,3) == "..") colnames(import$intervals)[1] <- substr(colnames(import$intervals)[1], 4 , nchar(colnames(import$intervals)[1]))
+    if(substr(colnames(import$layers)[1],2,3) == "..") colnames(import$layers)[1] <- substr(colnames(import$layers)[1], 4 , nchar(colnames(import$layers)[1]))
+    
+    return(import)
+  }
+}
 
-loadCruise <- function(CruiseName,SpeciesName) {
+#  a function to make intermed table
+make.intermed <- function(import){
+  
+  import$cells$Layer_depth_min <- import$layers$Layer_depth_min[match(import$cells$Layer, import$layers$Layer)]
+  import$cells$Layer_depth_max <- import$layers$Layer_depth_max[match(import$cells$Layer, import$layers$Layer)]
+  
+  import$intermed <- import$cells[,c("Process_ID","Interval","Region_class","Layer_depth_min" , "Layer_depth_max", "PRC_NASC")]
+  import$intermed <- import$intermed[import$intermed$PRC_NASC >0,]
+  
+  NASC_sum <- aggregate(PRC_NASC ~ Interval + Layer_depth_min +., sum, data = import$intermed)
+  import$intermed <- NASC_sum[,c("Process_ID","Interval","Region_class","Layer_depth_min" , "Layer_depth_max", "PRC_NASC")]
+  import$intermed <- import$intermed[order(import$intermed$Interval),] 
+  return(import)
+  
+}
+
+make.acoustic <- function(import){
+  
+  len <- length(import$interval$Process_ID)
+  
+  Country <- "IE"
+  Vessel <- "EIGB"
+  Cruise <- "CE15010"
+  Frequency <- 38
+  Minimum_integration_threshold <- import$analysis$Minimum_integration_threshold
+  if(is.null(Minimum_integration_threshold)) Minimum_integration_threshold <- -70
+  
+  import$acoustic <- as.data.frame(
+    cbind(
+      rep(Country, len), #Country
+      rep(Vessel, len), #Vessel
+      rep(Cruise, len), #Cruise
+      as.numeric(import$interval$VL_end)  ,             # Log (VL_End)
+      as.numeric(substr(import$interval$Date_E, 1,4)), #Year
+      as.numeric(substr(import$interval$Date_E, 5,6)), #Month
+      as.numeric(substr(import$interval$Date_E, 7,8)), #Day
+      as.numeric(substr(import$interval$Time_E, 2,3)) ,#HH
+      as.numeric(substr(import$interval$Time_E, 5,6)), #MM
+      as.numeric(import$interval$Lat_E), #Lat_E
+      as.numeric(import$interval$Lon_E), #Lon_E
+      round(import$interval$VL_end - import$interval$VL_start), #Logint
+      rep(Frequency, len), #Frequency
+      rep(Minimum_integration_threshold, len)
+      #, #Minimum_integration_threshold
+      #import$interval$Process_ID,
+      #import$interval$Interval
+    ),stringsAsFactors =F)
+  
+    #if(dim(import$acoustic)[2] != 16) {return ("Error: incorrect number of columns, check EV output file")} else {
+    if(dim(import$acoustic)[2] != 14) {return ("Error: incorrect number of columns, check EV output file")} else {
+      
+#     colnames(import$acoustic) <- c("Country", "Vessel", "Cruise", "Log", "Year", 
+#                                    "Month", "Day", "HH", "MM", "Lat_E", "Lon_E", 
+#                                    "Logint", "Frequency", "Minimum_integration_threshold",
+#                                    "Process_ID", "Interval")  
+    #Stox colnames
+    colnames(import$acoustic) <- c("Country", "Vessel", "Cruise", "Log", "Year", 
+                                   "Month", "Day", "Hour", "Min", "AcLat", "AcLon", 
+                                   "Logint", "Frequency", "Sv_threshold")
+
+    return(import)
+  }
+}
+
+make.acousticValue <- function(import){
+  import$Acousticvalues <- merge(import$intermed, import$acoustic, sort = F )
+  dim(import$Acousticvalues)
+  colnames(import$Acousticvalues)
+  
+  import$Acousticvalues <- import$Acousticvalues[, c("Country", "Vessel", "Cruise",
+                                                     "Log", "Year", "Month", "Day",
+                                                     "Region_class", "Layer_depth_min",
+                                                     "Layer_depth_max", "PRC_NASC")]
+  
+  if(dim(import$Acousticvalues)[2] != 11) {return ("Error: incorrect number of columns, check EV output file")} else {
+    #colnames(import$Acousticvalues) <- c("Country", "Vessel", "Cruise", "Log", "Year", "Month", "Day", "Species", "ChUppdepth", "ChLowdepth", "SA")
+    colnames(import$Acousticvalues) <- c("Country", "Vessel", "Cruise", "Log", "Year", "Month", "Day", "SACat", "ChUppdepth", "ChLowdepth", "SA")
+    return(import)
+  }
+}
+
+
+fGenAcoustic <- function(Cruise){
+
+  #read files from Echoview4StoX and output the 2 Stox acoustic files
+  #SurvName_Acoustic.csv and SurvName_AcousticValues.csv
+  
+  #output filenames
+  fAcoustic <- paste("./Data/",getName(Cruise),"/StoX/",getCode(Cruise),"_Acoustic.csv",sep="")
+  fAcousticValues <- paste("./Data/",getName(Cruise),"/StoX/",getCode(Cruise),"_AcousticValues.csv",sep="")
+  
+  #input folder
+  ipdir <- paste("./Data/",getName(Cruise),"/Echoview4StoX/",sep="")
+  
+  #get the input filelist (only csv files in the named folder)
+  files <- list.files(path=ipdir)
+  files <- files[grep(".csv", files)]
+  transects <- unique(as.numeric(gsub("\\D", "", files)))
+
+  if(length(files)/length(transects)!= 4) print("Error: should be 4 csv files for each and every transect")
+  
+  Country <- getCountryCode(Cruise)
+  Vessel <- getCallSign(Cruise)
+  CruiseCode <- getCode(Cruise)
+  Frequency <- 38
+  Year <- lubridate::year(getStartDate(Cruise))
+
+  #function to do it all
+  do.all <- function(Transect){
+    #cat(Transect,"\n")
+    inprep <- import.csvs(Transect, files, ipdir)
+    inprep <- make.intermed(inprep)
+    inprep <- make.acoustic(inprep)
+    inprep <- make.acousticValue(inprep)
+    return(inprep)
+  }
+
+  #test <- do.all(transects[1])
+  
+  all.transects <- lapply(transects, do.all)
+  names(all.transects) <- transects
+  
+  acoustic.table       <- do.call( rbind, lapply(all.transects, function(x) x$acoustic))
+  acousticvalue.table  <- do.call( rbind, lapply(all.transects, function(x) x$Acousticvalues))
+ 
+  acousticvalue.table$ChRange <- acousticvalue.table$ChLowdepth - acousticvalue.table$ChUppdepth
+  acousticvalue.table$MixHaulID <- NA
+  
+  #Formatting for Herring EV Template
+  #unique(acousticvalue.table$Species)
+  #dim(acousticvalue.table)
+  acousticvalue.table <- acousticvalue.table[toupper(trim(acousticvalue.table$SACat)) != toupper("Unclassified"),]
+  acousticvalue.table <- acousticvalue.table[toupper(trim(acousticvalue.table$SACat)) != toupper("Possibly Herring"),]
+  
+  #dim(acousticvalue.table)
+  
+  #unique(acousticvalue.table$SACat)
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Herring in a mix"), "HER")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Probably Herring"), "HER")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Def Herring"), "HER")
+  
+  #unique(acousticvalue.table$SACat)
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Def Mack"), "MAC")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Prob Mack"), "MAC")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Poss Mack"), "MAC")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Mac in a mix"), "MAC")
+  
+  #unique(acousticvalue.table$SACat)
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Def Scad"), "HOM")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Poss Scad"), "HOM")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Prob Scad"), "HOM")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Scad in a mix"), "HOM")
+  
+  #unique(acousticvalue.table$SACat)
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Def Sprat"), "SPR")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Prob Sprat"), "SPR")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Sprat in a mix"), "SPR")
+  
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Def Boarfish"), "BOF")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Prob Boarfish"), "BOF")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Bof in a mix"), "BOF")
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Boarfish to be corrected"), "BOF")
+  
+  acousticvalue.table$SACat <- replace (acousticvalue.table$SACat, toupper(trim(acousticvalue.table$SACat)) == toupper("Blue whiting"), "WHB")
+  #unique(acousticvalue.table$SACat)
+  
+  #Removing Log values from acoustic.table that are not included in the acousticvalues.table
+  #dim(acoustic.table)
+  #dim(acousticvalue.table)
+  acoustic.table <- acoustic.table[acoustic.table$Log %in% unique(acousticvalue.table$Log),]
+  #dim(acoustic.table)
+  #unique(acousticvalue.table$Log)
+  #match(acoustic.table$Log, acousticvalue.table$Log)
+  #match(acousticvalue.table$Log, acoustic.table$Log)
+  
+  #write to two csv files
+  write.csv(acoustic.table,        file = fAcoustic,        quote = F, row.names = F)
+  write.csv(acousticvalue.table[,c(1,2,3,4,5,6,7,8,9,10,12,11,13)], file = fAcousticValues, quote = F, row.names = F)
+  
+  return(paste0(nrow(acoustic.table)," lines written to ",fAcoustic,"\n",nrow(acousticvalue.table)," lines written to ",fAcousticValues,"\n"))
+     
+}
+
+fGenCatch <- function(Cruise,Hauls){
+
+  sf <- getOption("stringsAsFactors")
+  options(stringsAsFactors = FALSE)
+  
+  #output filename
+  fCatch <- paste("./Data/",getName(Cruise),"/StoX/",getCode(Cruise),"_Catch.csv",sep="")
+
+  #generate the catch file required for upload to the ICES acoustic database
+
+  #catch table description (ref WKEVAL Report 2015)
+  #RType            C                                 M
+  #Country          Post code, ISO_3166               M
+  #Vessel           Call sign (ShipC Code)            M
+  #Cruise           Cruise identifier                 M
+  #Station          Integers                          M
+  #StType           PTRAWL=Pel, BTRAWL=Btm trawl      M
+  #Year             YYYY (4 digits)                   M
+  #Haulvalidity     Valid haul = 1, Not = 0           M
+  #FAOCode          HER,WHB etc                       M
+  #Species          Species code:AphiaID              M
+  #Sorting_Species  L=Large, S=small, C=combined      
+  #Sppselect                                          M
+  #Catch            Weight of total catch (kg)        M
+  #Subsample        Weight of sub-sample (kg)         M
+  #Towtime          Trawl duration (mins)             M
+  #Wirelength       Trawl warp length                 
+  #TowSpeed         Speed in knots
+  #TrawlDepth       Mean Depth of trawl
+
+  #empty data frame
+  op <- data.frame("Country" = character(),
+                   "Vessel" = character(),
+                   "Cruise" = character(),
+                   "Station" = integer(),
+                   "StType" = character(),
+                   "Year" = integer(),
+                   "Haulvalidity" = character(),
+                   "FAOCode" = character(),
+                   "Species" = character(),
+                   "Sorting_Species" = character(),
+                   "Sppselect" = character(),
+                   "Catch" = double(),
+                   "Subsample" = double(),
+                   "Towtime" = integer(),
+                   "Wirelength" = integer(),
+                   "Towspeed" = double(),
+                   "Trawldepth" = integer())
+
+  #Species sampled
+  t <- lapply(lapply(Hauls,getBioSpecies),names)[lapply(lapply(lapply(Hauls,getSpecies),names),length)>0]
+
+  for (h in names(t)){
+    
+    for (spe in t[[h]]) {
+      
+      #only write data for species with valid FAO codes
+      FAO <- "XXX"
+      if (!is.null(Species[[which(lapply(Species,getName)==toupper(spe))[1]]])){FAO<-getFAOCode(Species[[which(lapply(Species,getName)==toupper(spe))[1]]])}
+      
+      if (!FAO=="XXX") {
+        op <- rbind(op,
+                    data.frame("Country" = getCountryCode(Cruise),
+                               "Vessel" = getCallSign(Cruise),
+                               "Cruise" = getCode(Cruise),
+                               "Station" = h,
+                               "StType" = "PTRAWL",
+                               "Year" = lubridate::year(getStartTime(getCode(Hauls[[h]]))),
+                               "Haulvalidity" = {if (isValid(getCode(Hauls[[h]]))[1]=="TRUE") {1} else {0}},
+                               "FAOCode" = {if (!is.null(Species[[which(lapply(Species,getName)==toupper(spe))[1]]]))
+                               {getFAOCode(Species[[which(lapply(Species,getName)==toupper(spe))[1]]])} 
+                                 else {paste(spe,"Not listed - check fLoad_Species_Details")}},
+                               "Species" = {if (!is.null(Species[[which(lapply(Species,getName)==toupper(spe))[1]]]))
+                               {getCode(Species[[which(lapply(Species,getName)==toupper(spe))[1]]])} 
+                                 else {paste(spe,"Not listed - check fLoad_Species_Details")}},
+                               "Sorting_Species" = "C",
+                               "Sppselect" = 1,
+                               "Catch" = getCatchWeight(Hauls[[h]],spe),
+                               "Subsample" = getSubSampleWeight(Hauls[[h]],spe),
+                               "Towtime" = getDuration(Hauls[[h]]),
+                               "Wirelength" = getWireLength(Hauls[[h]]),
+                               "TowSpeed" = getSpeed(Hauls[[h]]),
+                               "Trawldepth" = getDepth(Hauls[[h]])))
+      } else {
+        cat(paste0("No FAO code found for ",spe," (in Haul ",h,")\n"))
+      }
+    }
+  }  
+  
+  write.csv(file = fCatch, x = op, row.names = FALSE, quote = FALSE)
+  
+  #reset global option
+  options(stringsAsFactors = sf)
+  
+  return(paste0(nrow(op)," lines written to ",fCatch,"\n"))
+  
+}
+
+fGenBiology <- function(Cruise,Hauls)
+{
+
+  sf <- getOption("stringsAsFactors")
+  options(stringsAsFactors = FALSE)
+  matlookup <- c("1"="IMM", "2"="IMM", "3"="MAT", "4"="MAT", "5"="MAT", "6"="MAT", "7"="MAT", "8"="MAT", "NA"="NA")
+  
+  #output filename
+  fBiology <- paste("./Data/",getName(Cruise),"/StoX/",getCode(Cruise),"_Biology.csv",sep="")
+  
+  #generate the biology file required for upload to the ICES acoustic database
+
+  #biology table description (ref WKEVAL Report 2015)
+  #RType            B                                 M
+  #Country          Post code, ISO_3166               M
+  #Vessel           Call sign (ShipC Code)            M
+  #Cruise           Cruise identifier                 M
+  #Station          Integers                          M
+  #StType           PTRAWL=Pel, BTRAWL=Btm trawl      M
+  #Year             YYYY (4 digits)                   M
+  #FAOCode          HER, WHB etc                      M
+  #Species          Species code:AphiaID              M
+  #Sorting_Species  L=large, S-small, C-combined
+  #Length           Nearest 1cm or 0.5cm below        M
+  #Weight           In grams
+  #AgeScale         Age years
+  #AgeOtolith       Age years
+  #Sex              Female=1, Male=2, 0=undetermined
+  #Maturation       8 point scale only
+  #StomFullness     Visual reading 1-5 (ICES scale)
+  #Icthyophonous    P=present, A=absent
+  #StockID          NSAS,WBSS,CBH,VIaN,VIaS
+  #VertCount        xxx
+  #Recnr                                              M
+
+  #empty data frame
+  op <- data.frame("Country" = character(),
+                   "Vessel" = character(),
+                   "Cruise" = character(),
+                   "Station" = integer(),
+                   "StType" = character(),
+                   "Year" = integer(),
+                   "FAOCode" = character(),
+                   "Species" = character(),
+                   "Sorting_Species" = character(),
+                   "Length" = double(),
+                   "Weight" = double(),
+                   "AgeScale" = integer(),
+                   "AgeOtolith" = integer(),
+                   "Sex" = integer(),
+                   "Maturation" = character(),
+                   "StomFullness" = integer(),
+                   "Icthyophonous" = character(),
+                   "StockID" = character(),
+                   "VertCount" = character(),
+                   "Recnr" = integer())
+
+  
+    
+  #Species sampled for length by hauls
+  t <- lapply(lapply(Hauls,getBioSpecies),names)[lapply(lapply(lapply(Hauls,getBioSpecies),names),length)>0]
+  
+  for (h in names(t)){
+    
+    for (spe in t[[h]]) {
+      
+      bio <- getBio(Hauls[[h]],spe)
+      #substitute NA's with character version for maturity lookup
+      bio$maturity[is.na(bio$maturity)]<-"NA"
+      
+      #only write data for species with valid FAO codes
+      FAO <- "XXX"
+      if (!is.null(Species[[which(lapply(Species,getName)==toupper(spe))[1]]])){FAO<-getFAOCode(Species[[which(lapply(Species,getName)==toupper(spe))[1]]])}
+      
+      if (!FAO=="XXX") {
+        
+        op <- rbind(op,
+                    data.frame("Country" = rep(getCountryCode(Cruise),length(bio$len)),
+                               "Vessel" = rep(getCallSign(Cruise),length(bio$len)),
+                               "Cruise" = rep(getCode(Cruise),length(bio$len)),
+                               "Station" = rep(h,length(bio$len)),
+                               "StType" = rep("PTRAWL",length(bio$len)),
+                               "Year" = rep(lubridate::year(getStartTime(getCode(Hauls[[h]]))),length(bio$len)),
+                               "FAOCode" = {if (!is.null(Species[[which(lapply(Species,getName)==toupper(spe))[1]]]))
+                               {rep(getFAOCode(Species[[which(lapply(Species,getName)==toupper(spe))[1]]]),length(bio$len))} 
+                                 else {rep(paste(spe,"Not listed - check fLoad_Species_Details"),length(bio$len))}},
+                               "Species" = {if (!is.null(Species[[which(lapply(Species,getName)==toupper(spe))[1]]]))
+                                 {rep(getCode(Species[[which(lapply(Species,getName)==toupper(spe))[1]]]),length(bio$len))} 
+                                 else {rep(paste(spe,"Not listed - check fLoad_Species_Details"),length(bio$len))}},
+                               "Sorting_Species" = rep("C",length(bio$len)),
+                               "Length" = bio$len,
+                               "Weight" = bio$wgt,
+                               "AgeScale" = rep("NA",length(bio$len)),
+                               "AgeOtolith" = bio$age,
+                               "Sex" = bio$sex,
+                               "Maturation" = matlookup[bio$maturity],
+                               "StomFullness" = rep("NA",length(bio$len)),
+                               "Icthyophonous" = rep("NA",length(bio$len)),
+                               "StockID" = rep("NA",length(bio$len)),
+                               "VertCount" = rep("NA",length(bio$len)),
+                               "Recnr" = bio$index))
+      } else {
+        cat(paste0("No FAO code found for ",spe," (in Haul ",h,")\n"))
+      }
+    }
+  }  
+  
+  write.csv(file = fBiology, x = op, row.names = FALSE, quote = FALSE)
+  
+  #reset global option
+  options(stringsAsFactors = sf)
+  
+  return(paste0(nrow(op)," lines written to ",fBiology,"\n"))
+  
+}
+
+fGenLogbook <- function(Cruise,CTD,Haul,Transect)
+{
+  require(lubridate)
+  sf <- getOption("stringsAsFactors")
+  options(stringsAsFactors = FALSE)
+
+  #output filename
+  fLogBook <- paste("./Data/",getName(Cruise),"/StoX/",getCode(Cruise),"_LogBook.csv",sep="")
+  
+  #generate the logbook file required for upload to the ICES acoustic database
+  
+  op <- rbind(data.frame("Country" = rep(getCountryCode(Cruise),length(CTD)),
+                         "Vessel" = rep(getCallSign(Cruise),length(CTD)),
+                         "Cruise" = rep(getCode(Cruise),length(CTD)),
+                         "Station" = unlist(lapply(CTD,getCode)),
+                         "StType" = rep("CTD",length(CTD)),
+                         "Year" = unlist(lapply(lapply(CTDs,getTime),lubridate::year)),
+                         "Log" = rep("",length(CTD)),
+                         "Month" = sprintf("%02.0f",unlist(lapply(lapply(CTDs,getTime),lubridate::month))),
+                         "Day" = sprintf("%02.0f",unlist(lapply(lapply(CTDs,getTime),lubridate::day))),
+                         "Hour" = sprintf("%02.0f",unlist(lapply(lapply(CTDs,getTime),lubridate::hour))),
+                         "Min" = sprintf("%02.0f",unlist(lapply(lapply(CTDs,getTime),lubridate::minute))),
+                         "Lat" = unlist(lapply(CTDs,getLat)),
+                         "Lon" = unlist(lapply(CTDs,getLon)),
+                         "BottDepth" = rep(NA,length(CTD)),
+                         "WinDir" = rep(NA,length(CTD)),
+                         "WinSpeed" = rep(NA,length(CTD))),
+              data.frame("Country" = rep(getCountryCode(Cruise),length(Haul)),
+                         "Vessel" = rep(getCallSign(Cruise),length(Haul)),
+                         "Cruise" = rep(getCode(Cruise),length(Haul)),
+                         "Station" = unlist(lapply(Haul,getCode)),
+                         "StType" = rep("PTRAWL",length(Haul)),
+                         "Year" = unlist(lapply(lapply(lapply(Hauls,getCode),getStartTime),lubridate::year)),
+                         "Log" = rep("",length(Haul)),
+                         "Month" = sprintf("%02.0f",unlist(lapply(lapply(lapply(Haul,getCode),getStartTime),lubridate::month))),
+                         "Day" = sprintf("%02.0f",unlist(lapply(lapply(lapply(Haul,getCode),getStartTime),lubridate::day))),
+                         "Hour" = sprintf("%02.0f",unlist(lapply(lapply(lapply(Haul,getCode),getStartTime),lubridate::hour))),
+                         "Min" = sprintf("%02.0f",unlist(lapply(lapply(lapply(Haul,getCode),getStartTime),lubridate::minute))),
+                         "Lat" = unlist(lapply(lapply(lapply(Haul,getCode),shootPos),"[",1)),
+                         "Lon" = unlist(lapply(lapply(lapply(Haul,getCode),shootPos),"[",2)),
+                         "BottDepth" = rep(NA,length(Haul)),
+                         "WinDir" = rep(NA,length(Haul)),
+                         "WinSpeed" = rep(NA,length(Haul))),
+              data.frame("Country" = rep(getCountryCode(Cruise),length(Transect)),
+                         "Vessel" = rep(getCallSign(Cruise),length(Transect)),
+                         "Cruise" = rep(getCode(Cruise),length(Transect)),
+                         "Station" = seq(1,2*length(Transect),by=2),
+                         "StType" = rep("CC",length(Transect)),
+                         "Year" =  unname(unlist(lapply(lapply(Transects,getStartDate),lubridate::year))),
+                         "Log" = rep("",length(Transect)),
+                         "Month" = sprintf("%02.0f",unlist(lapply(lapply(Transects,getStartDate),lubridate::month))),
+                         "Day" = sprintf("%02.0f",unlist(lapply(lapply(Transects,getStartDate),lubridate::day))),
+                         "Hour" = sprintf("%02.0f",unlist(lapply(lapply(Transects,getStartDate),lubridate::hour))),
+                         "Min" = sprintf("%02.0f",unlist(lapply(lapply(Transects,getStartDate),lubridate::minute))),
+                         "Lat" = unname(unlist(lapply(lapply(Transects,getStartPos),getLat))),
+                         "Lon" = unname(unlist(lapply(lapply(Transects,getStartPos),getLon))),
+                         "BottDepth" = rep(NA,length(Transect)),
+                         "WinDir" = rep(NA,length(Transect)),
+                         "WinSpeed" = rep(NA,length(Transect))),
+              data.frame("Country" = rep(getCountryCode(Cruise),length(Transect)),
+                         "Vessel" = rep(getCallSign(Cruise),length(Transect)),
+                         "Cruise" = rep(getCode(Cruise),length(Transect)),
+                         "Station" = seq(1,2*length(Transect),by=2)+1,
+                         "StType" = rep("CC",length(Transect)),
+                         "Year" =  unname(unlist(lapply(lapply(Transects,getEndDate),lubridate::year))),
+                         "Log" = rep("",length(Transect)),
+                         "Month" = sprintf("%02.0f",unlist(lapply(lapply(Transects,getEndDate),lubridate::month))),
+                         "Day" = sprintf("%02.0f",unlist(lapply(lapply(Transects,getEndDate),lubridate::day))),
+                         "Hour" = sprintf("%02.0f",unlist(lapply(lapply(Transects,getEndDate),lubridate::hour))),
+                         "Min" = sprintf("%02.0f",unlist(lapply(lapply(Transects,getEndDate),lubridate::minute))),
+                         "Lat" = unname(unlist(lapply(lapply(Transects,getEndPos),getLat))),
+                         "Lon" = unname(unlist(lapply(lapply(Transects,getEndPos),getLon))),
+                         "BottDepth" = rep(NA,length(Transect)),
+                         "WinDir" = rep(NA,length(Transect)),
+                         "WinSpeed" = rep(NA,length(Transect))))
+  
+  #write to output in chronological order
+  write.csv(file = fLogBook, 
+            x = op[order(op$Year,op$Month,op$Day,op$Hour,op$Min),],
+            row.names = FALSE,
+            quote = FALSE)
+  
+  #reset global option
+  options(stringsAsFactors = sf)
+
+  return(paste0(nrow(op)," lines written to ",fLogBook,"\n"))
+  
+}
+
+fLoadCruise <- function(CruiseName,SpeciesName) {
 
   #load cruise details from flat file and create cruise object
   fCruise <- paste("./Data/",CruiseName,"/",CruiseName,"_",SpeciesName,".dat",sep="")
@@ -15,6 +522,14 @@ loadCruise <- function(CruiseName,SpeciesName) {
   
   #read in cruise data 
   chrCruise <- scan(file=fCruise,what="character",sep="\n",quiet=TRUE)
+  
+  #country code
+  if (!sum((toupper(substr(chrCruise,1,14))==toupper("Country Code::"))==1)){
+    cat("Cannot find unique \"Country Code\" line in cruise data file\n")
+    return(NULL)
+  } else {
+    countrycode <- unlist(strsplit(chrCruise[toupper(substr(chrCruise,1,14))==toupper("Country Code::")],"::"))[2]  
+  }
   
   #cruise code
   if (!sum((toupper(substr(chrCruise,1,13))==toupper("Cruise Code::"))==1)){
@@ -45,7 +560,15 @@ loadCruise <- function(CruiseName,SpeciesName) {
     cat("Cannot find unique \"Vessel\" line in cruise data file\n")
     return(NULL)
   } else {
-    vessl <- unlist(strsplit(chrCruise[toupper(substr(chrCruise,1,8))==toupper("Vessel::")],"::"))[2]  
+    vesselname <- unlist(strsplit(chrCruise[toupper(substr(chrCruise,1,8))==toupper("Vessel::")],"::"))[2]  
+  }
+
+  #callsign
+  if (!sum((toupper(substr(chrCruise,1,10))==toupper("CallSign::"))==1)){
+    cat("Cannot find unique \"CallSign\" line in cruise data file\n")
+    return(NULL)
+  } else {
+    callsign <- unlist(strsplit(chrCruise[toupper(substr(chrCruise,1,10))==toupper("CallSign::")],"::"))[2]  
   }
   
   #start date
@@ -81,8 +604,8 @@ loadCruise <- function(CruiseName,SpeciesName) {
   }
   
   #create the cruise object via a call to the class constructor
-  cruise(code=code,name=name,desc=desc,vessel=vessl,
-         start_date=as.POSIXlt(strptime(stdt,"%Y-%m-%d %H:%M:%S")),
+  cruise(countrycode=countrycode,code=code,name=name,desc=desc,vesselname=vesselname,
+         callsign=callsign,start_date=as.POSIXlt(strptime(stdt,"%Y-%m-%d %H:%M:%S")),
          end_date=as.POSIXlt(strptime(eddt, "%Y-%m-%d %H:%M:%S")),
          target_common=tgtc, target_scientific=tgts)
 
@@ -468,6 +991,8 @@ fLoad_Mark_Types <- function(CruiseName, SpeciesName){
 
 fLoad_CTDs <- function(CruiseCode, CruiseName, DBCTDs=NULL) {
 
+  require(lubridate)
+  
   #if DBCTDs is not supplied, read the data from the csv
 
   ret <- c()
@@ -508,8 +1033,8 @@ fLoad_CTDs <- function(CruiseCode, CruiseName, DBCTDs=NULL) {
                ctdstation(lat = {if (DBCTDs$Lat_Deg[i]>0) {DBCTDs$Lat_Deg[i] + DBCTDs$Lat_Min[i]/60} else {DBCTDs$Lat_Deg[i] - DBCTDs$Lat_Min[i]/60}},
                           lon = {if (DBCTDs$Lon_Deg[i]>0) {DBCTDs$Lon_Deg[i] + DBCTDs$Lon_Min[i]/60} else {DBCTDs$Lon_Deg[i] - DBCTDs$Lon_Min[i]/60}},
                           code = as.character(DBCTDs$CTD[i]),
-                          cruise_code = CruiseCode))
-      
+                          cruise_code = CruiseCode,
+                          time = as.POSIXlt(strptime(paste(DBCTDs$CTD_Date[i],DBCTDs$CTD_Time[i],sep=" "),"%d/%m/%Y %H:%M:%S"))))
     }
     
   }
@@ -530,22 +1055,23 @@ fLoad_Hauls <- function(CruiseCode) {
         spe <- vector("list",length=length(Samples$HaulNo[Samples$HaulNo==Hauls$HaulNo[h]]))
         names(spe) <- toupper(Samples$SpeciesName[Samples$HaulNo==Hauls$HaulNo[h]])
         
-        fill <- vector("list",length=9)
+        fill <- vector("list",length=11)
         names(fill) <- c("samp.wgt","sub.samp.wgt","tot.wgt","len.class","num.at.len",
-                         "length","weight","age","maturity")
+                         "length","weight","age","sex","maturity","index")
         
         if (length(spe)>0) {
-          
           for (s in 1:length(spe)){
-            fill$samp.wgt<-Samples$SampleWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
-            fill$sub.samp.wgt<-Samples$SubSampleWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
-            fill$tot.wgt<-Samples$TotalWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
-            fill$len.class<-LF$LengthClass[LF$HaulNo==Hauls$HaulNo[h] & LF$SpeciesName==names(spe)[s]]
-            fill$num.at.len<-LF$SubSampleFrequency[LF$HaulNo==Hauls$HaulNo[h] & LF$SpeciesName==names(spe)[s]]
-            fill$length<-Ages$LenClass[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
-            fill$weight<-Ages$Weight[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
-            fill$age<-Ages$Age[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
-            fill$maturity<-Ages$Maturity[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
+            fill$samp.wgt <- Samples$SampleWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
+            fill$sub.samp.wgt <- Samples$SubSampleWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
+            fill$tot.wgt <- Samples$TotalWeight[Samples$HaulNo==Hauls$HaulNo[h] & Samples$SpeciesName==names(spe)[s]]
+            fill$len.class <- LF$LengthClass[LF$HaulNo==Hauls$HaulNo[h] & LF$SpeciesName==names(spe)[s]]
+            fill$num.at.len <- LF$SubSampleFrequency[LF$HaulNo==Hauls$HaulNo[h] & LF$SpeciesName==names(spe)[s]]
+            fill$length <- Ages$LenClass[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
+            fill$weight <- Ages$Weight[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
+            fill$age <- Ages$Age[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
+            fill$sex <- Ages$Sex[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
+            fill$maturity <- Ages$Maturity[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
+            fill$index <- Ages$Index[Ages$HaulNo==Hauls$HaulNo[h] & Ages$SpeciesName==names(spe)[s]]
             spe[[s]]<-fill
           }
         }      
@@ -568,6 +1094,9 @@ fLoad_Hauls <- function(CruiseCode) {
                     haul_wp = waypoint(lat=Hauls$HaulLat[h],
                                        lon=Hauls$HaulLon[h],
                                        time=as.POSIXlt(strptime(Hauls$HaulDateTime[h],"%d/%m/%Y %H:%M"))),
+                    wirelength = Hauls$Wirelength[h],
+                    towspeed = Hauls$TowSpeed[h],
+                    trawldepth = Hauls$TrawlDepth[h],
                     species = spe)
         
         ret<-c(ret,tmp)
@@ -776,82 +1305,114 @@ fLoad_Species_Details <- function(CruiseCode){
 
   ret <-
     list(
-       "Herring" = targetspecies(species="Clupea Herrangus",common_name="Herring",LF_bin_size=0.5,
-                                 ts_a=20,ts_b=-71.2,ts_LFint=0.5,imm_codes=as.character(c(1,2)),
+       "Herring" = targetspecies(species="Clupea Harengus",common_name="Herring",AphiaID=126417,
+                                 LF_bin_size=0.5,ts_a=20,ts_b=-71.2,ts_LFint=0.5,imm_codes=as.character(c(1,2)),
                                  mat_codes=as.character(c(3,4,5,6)),spt_codes=as.character(c(7,8)),
                                  est_abd=TRUE,est_by_age=TRUE,est_by_mat=TRUE),
-      "Sprat" = targetspecies(species="Sprattus sprattus",common_name="Sprat",LF_bin_size=0.5,
-                              imm_codes="",mat_codes="",spt_codes="",
+      "Sprat" = targetspecies(species="Sprattus sprattus",common_name="Sprat",AphiaID=126425,
+                              LF_bin_size=0.5,imm_codes="",mat_codes="",spt_codes="",
                               ts_a=20,ts_b=-71.2,ts_LFint=0.5,est_abd=FALSE,est_by_age=FALSE,
                               est_by_mat=FALSE),
-      "Scad" = targetspecies(species="Trachurus trachurus",common_name="Scad",LF_bin_size=1.0,
-                             imm_codes="",mat_codes="",spt_codes="",
+      "Scad" = targetspecies(species="Trachurus trachurus",common_name="Scad",AphiaID=126822,
+                             LF_bin_size=1.0,imm_codes="",mat_codes="",spt_codes="",
                              ts_a=20,ts_b=-67.5,ts_LFint=1.0,est_abd=FALSE,est_by_age=FALSE,
                              est_by_mat=FALSE),
-      "Mackerel" = targetspecies(species="Scomber scombrus",common_name="Mackerel",LF_bin_size=1.0,
-                                 imm_codes="",mat_codes="",spt_codes="",
+      "Mackerel" = targetspecies(species="Scomber scombrus",common_name="Mackerel",AphiaID=127023,
+                                 LF_bin_size=1.0,imm_codes="",mat_codes="",spt_codes="",
                                  ts_a=20,ts_b=-84.9,ts_LFint=1.0,est_abd=FALSE,est_by_age=FALSE,
                                  est_by_mat=FALSE),
-      "Pilchard" = targetspecies(species="Sardina pilchardus",common_name="Sardine",LF_bin_size=1.0,
-                                 imm_codes="",mat_codes="",spt_codes="",
+      "Pilchard" = targetspecies(species="Sardina pilchardus",common_name="Sardine",AphiaID=126421,
+                                 LF_bin_size=1.0,imm_codes="",mat_codes="",spt_codes="",
                                  ts_a=20,ts_b=-66.4,ts_LFint = 1.0,est_abd=FALSE,est_by_age=FALSE,
                                  est_by_mat=FALSE),
-      "Boarfish" = targetspecies(species="Capros aper",common_name="Boarfish",LF_bin_size=0.5,
-                                 imm_codes=c("Immature"),mat_codes=c("Mature"),spt_codes=c("Spent"),
+      "Boarfish" = targetspecies(species="Capros aper",common_name="Boarfish",AphiaID=127419,
+                                 LF_bin_size=0.5,imm_codes=c("Immature"),mat_codes=c("Mature"),spt_codes=c("Spent"),
                                  ts_a=20,ts_b=-66.2,ts_LFint=0.5,est_abd=TRUE,est_by_age=TRUE,
                                  est_by_mat=TRUE),
-      "Whiting" = targetspecies(species="Merlangus merlangus",common_name="Whiting",LF_bin_size=1,
-                                imm_codes="",mat_codes="",spt_codes="",
+      "Whiting" = targetspecies(species="Merlangius merlangus",common_name="Whiting",AphiaID=126438,
+                                LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
                                 ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
                                 est_by_mat=FALSE),
-      "Grey Gurnard" = targetspecies(species="Eutrigla Gurnardus",common_name="Grey Gurnard",LF_bin_size=1,
-                                     imm_codes="",mat_codes="",spt_codes="",
+      "Grey Gurnard" = targetspecies(species="Eutrigla Gurnardus",common_name="Grey Gurnard",AphiaID=150637,
+                                     LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
                                      ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
                                      est_by_mat=FALSE),
-      "Jellyfish" = targetspecies(species="Aurelia sp.",common_name="Jellyfish",LF_bin_size=1,
-                                     imm_codes="",mat_codes="",spt_codes="",
-                                     ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
-                                     est_by_mat=FALSE),
-      "Monk" = targetspecies(species="Lophius Budegassa",common_name="Monk",LF_bin_size=1,
-                                  imm_codes="",mat_codes="",spt_codes="",
+      "Jellyfish" = targetspecies(species="Aurelia sp.",common_name="Jellyfish",AphiaID=NA_real_,
+                                  LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
                                   ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
                                   est_by_mat=FALSE),
-      "Hake" = targetspecies(species="Merluccius merluccius",common_name="Hake",LF_bin_size=1,
-                             imm_codes="",mat_codes="",spt_codes="",
+      "Monk" = targetspecies(species="Lophius Budegassa",common_name="Monk",AphiaID=126554,
+                             LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
                              ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
                              est_by_mat=FALSE),
-      "Argentine" = targetspecies(species="Argentina sphyrena",common_name="Argentine",LF_bin_size=1,
-                             imm_codes="",mat_codes="",spt_codes="",
+      "Hake" = targetspecies(species="Merluccius merluccius",common_name="Hake",AphiaID=126484,
+                             LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
                              ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
-                             est_by_mat=FALSE),    
-      "Red Gurnard" = targetspecies(species="ASPITRIGLIA CUCULUS",common_name="Red Gurnard",LF_bin_size=1,
-                                     imm_codes="",mat_codes="",spt_codes="",
-                                     ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
-                                     est_by_mat=FALSE),
-      "Norway Pout" = targetspecies(species="TRISOPTERUS ESMARKII",common_name="Norway Pout",LF_bin_size=1,
-                                    imm_codes="",mat_codes="",spt_codes="",
+                             est_by_mat=FALSE),
+      "Argentine" = targetspecies(species="Argentina sphyrena",common_name="Argentine",AphiaID=126716,
+                                  LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
+                                  ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                                  est_by_mat=FALSE),    
+      "Red Gurnard" = targetspecies(species="ASPITRIGLIA CUCULUS",common_name="Red Gurnard",AphiaID=150662,
+                                    LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
                                     ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
                                     est_by_mat=FALSE),
-      "Horse Mackerel" = targetspecies(species="Trachurus trachurus",common_name="Horse Mackerel",LF_bin_size=1.0,
-                                 imm_codes="",mat_codes="",spt_codes="",
-                                 ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
-                                 est_by_mat=FALSE),
-      "Poor Cod" = targetspecies(species="TRISOPTERUS MINUTUS",common_name="Poor Cod",LF_bin_size=1.0,
-                                       imm_codes="",mat_codes="",spt_codes="",
+      "Norway Pout" = targetspecies(species="TRISOPTERUS ESMARKII",common_name="Norway Pout",AphiaID=126444,
+                                    LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
+                                    ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                                    est_by_mat=FALSE),
+      "Horse Mackerel" = targetspecies(species="Trachurus trachurus",common_name="Horse Mackerel",AphiaID=126822,
+                                       LF_bin_size=1.0,imm_codes="",mat_codes="",spt_codes="",
                                        ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
                                        est_by_mat=FALSE),
-      "Ling" = targetspecies(species="Molva Molva",common_name="Ling",LF_bin_size=1.0,
-                                  imm_codes="",mat_codes="",spt_codes="",
-                                  ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
-                                  est_by_mat=FALSE),
-      "Blue whiting" = targetspecies(species="MICROMESISTIUS POUTASSOU",common_name="Blue Whiting",LF_bin_size=0.5,
-                                     ts_a=20,ts_b=-65.2,ts_LFint=0.5,imm_codes = "Immature",
+      "Poor Cod" = targetspecies(species="TRISOPTERUS MINUTUS",common_name="Poor Cod",AphiaID=126446,
+                                 LF_bin_size=1.0,imm_codes="",mat_codes="",spt_codes="",
+                                 ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                                 est_by_mat=FALSE),
+      "Ling" = targetspecies(species="Molva Molva",common_name="Ling",AphiaID=126461,
+                             LF_bin_size=1.0,imm_codes="",mat_codes="",spt_codes="",
+                             ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                             est_by_mat=FALSE),
+      "Blue whiting" = targetspecies(species="MICROMESISTIUS POUTASSOU",common_name="Blue Whiting",AphiaID=126439,
+                                     LF_bin_size=0.5,ts_a=20,ts_b=-65.2,ts_LFint=0.5,imm_codes = "Immature",
                                      mat_codes = "Mature", spt_codes = "Spent",
                                      est_abd=TRUE,est_by_age=TRUE,est_by_mat=TRUE),
-      "Squid" = targetspecies(species="ALL SQUID",common_name="Squid",LF_bin_size=1,
-                                     imm_codes="",mat_codes="",spt_codes="",
-                                     ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
-                                     est_by_mat=FALSE)
+      "Squid" = targetspecies(species="ALL SQUID",common_name="Squid",AphiaID=NA_real_,
+                              LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
+                              ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                              est_by_mat=FALSE),
+      "Sandeel" = targetspecies(species="Ammodytes Tobianus",common_name="Sandeel",AphiaID=126752,
+                                LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
+                                ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                                est_by_mat=FALSE),
+      "Spiny Dogfish" = targetspecies(species="Squalus Acanthius",common_name="Spiny Dogfish",AphiaID=105923,
+                                      LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
+                                      ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                                      est_by_mat=FALSE),
+      "Haddock" = targetspecies(species="Melanogrammus Aeglefinus",common_name="Haddock",AphiaID=126437,
+                                LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
+                                ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                                est_by_mat=FALSE),
+      "Angler White-Bellied" = targetspecies(species="Lophius Piscatorius",common_name="Angler White-Bellied",AphiaID=126555,
+                                             LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
+                                             ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                                             est_by_mat=FALSE),
+      "Mesopelagic SPP" = targetspecies(species="Mesopelagic SPP",common_name="Mesopelagic SPP",AphiaID=NA_real_,
+                                        LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
+                                        ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                                        est_by_mat=FALSE),
+      "Atlantic Salmon" = targetspecies(species="Salmo Salar",common_name="Atlantic Salmon",AphiaID=127186,
+                                        LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
+                                        ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                                        est_by_mat=FALSE),
+      "Small-Spotted Catshark" = targetspecies(species="Scyliorhinus canicula",common_name="Small-Spotted Catshark",AphiaID=105814,
+                                               LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
+                                               ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                                               est_by_mat=FALSE),
+      "Raitts Sandeel" = targetspecies(species="Ammodytes Marinus",common_name="Raitts Sandeel",AphiaID=126751,
+                                       LF_bin_size=1,imm_codes="",mat_codes="",spt_codes="",
+                                       ts_a=0,ts_b=0,ts_LFint=0,est_abd=FALSE,est_by_age=FALSE,
+                                       est_by_mat=FALSE)
     )
   
     
@@ -1049,26 +1610,26 @@ makeKey <- function(len,len.range,len.int,dat,dat.range,dat.int,propagate=T){
     #last
     last<-match(rev(rownames(key)[rowSums(key)>0])[1],rownames(key),0);
 
-    #if (first > 1) {
-    #  for (i in 1:(first-1)) {
-    #    key[i,]<-key[first,];
-    #  }
-    #}
+    if (first > 1) {
+      for (i in 1:(first-1)) {
+        key[i,]<-key[first,];
+      }
+    }
          
-    #if (last < nrow(key)) {
-    #  for (i in (last+1):nrow(key)){
-    #    key[i,]<-key[last,];
-    #  }
-    #}
+    if (last < nrow(key)) {
+      for (i in (last+1):nrow(key)){
+        key[i,]<-key[last,];
+      }
+    }
     
     #now for empty rows in the middle of the key
     #empty rows
-    #empty.rows <- c(1:nrow(key))[apply(key,1,sum)==0];
-    #non.empty.rows <- c(1:nrow(key))[apply(key,1,sum)>0];
+    empty.rows <- c(1:nrow(key))[apply(key,1,sum)==0];
+    non.empty.rows <- c(1:nrow(key))[apply(key,1,sum)>0];
     
-    #for (i in empty.rows){
-    #  key[i,]<-key[non.empty.rows[sort.list(abs(non.empty.rows-i))[1]],];
-    #}
+    for (i in empty.rows){
+      key[i,]<-key[non.empty.rows[sort.list(abs(non.empty.rows-i))[1]],];
+    }
            
   }
        
@@ -1350,23 +1911,25 @@ fCombine_LFs <- function(lIn, offset=NULL){
   t <- Filter(Negate(is.null),lIn)
   
   #vector of categories (lengths/ maturity stages/ maturities)
-  cat <-  sort(unique(unlist(lapply(t,names))))
+  cat <-  unique(unlist(lapply(t,names)))
   
   #create return object
   ret <- vector("numeric",length=length(cat))
   ret <- rep(0,length(cat))
   names(ret) <- cat
 
+  ret <- t[[1]]
+  
   #loop over categories, accumulating the summed values in ret
-  for (i in 1:length(t)){
-    
-    LF <- t[[i]]
-    
-    for (j in 1:length(LF)){
-      ret[[names(LF)[j]]] <- ret[[names(LF)[j]]] + LF[j]
+  if (length(t)>1) {
+    for (i in 2:length(t)){
+      ret <- tapply(c(ret,t[[i]]),names(c(ret,t[[i]])),sum)  
     }
-    
-  } 
+  }
+  
+  if (!any(is.na(as.numeric(names(ret))))) {
+    ret <- ret[as.character(sort(as.numeric(names(ret))))]
+  }
   
   #apply offset if supplied (for Length categories)
   if (!is.null(offset)) {
@@ -1384,7 +1947,7 @@ fAggregate_SA <- function(SA, MarkTypes) {
   
   #SA - the raw SA data
   if (is.null(SA)) return(c())
-  
+
   #calculate the mid position of mark
   SA$Mid.Lat <- (SA$Lat_S + SA$Lat_E)/2
   SA$Mid.Lon <- (SA$Lon_S + SA$Lon_E)/2
@@ -1467,3 +2030,14 @@ fAggregate_SA <- function(SA, MarkTypes) {
   ret[which(toupper(lapply(ret,getMarkType))%in%unlist(toupper(lapply(MarkTypes,getNASCName))))]
   
 }
+
+#some supporting functions to deal with string manipulation
+# returns string w/o leading whitespace
+trim.leading <- function (x)  sub("^\\s+", "", x)
+
+# returns string w/o trailing whitespace
+trim.trailing <- function (x) sub("\\s+$", "", x)
+
+# returns string w/o leading or trailing whitespace
+trim <- function (x) gsub("^\\s+|\\s+$", "", x)
+

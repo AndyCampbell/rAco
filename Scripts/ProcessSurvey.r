@@ -19,25 +19,29 @@
 rm(list=ls())
 gc()
 
+library(devtools)
+
 #load in libraries, function definitions, plotting data
 source("./Scripts/Init.r")
 
 #load Cruise data file
 
-Cruise <- loadCruise(CruiseName = "CSHAS2015", SpeciesName = "Herring")
+#Cruise <- loadCruise(CruiseName = "CSHAS2015", SpeciesName = "Sprat")
+#Cruise <- loadCruise(CruiseName = "CSHAS2015_Adaptive", SpeciesName = "Herring")
+#Cruise <- loadCruise(CruiseName = "CSHAS2015", SpeciesName = "Herring")
+#Cruise <- loadCruise(CruiseName = "CSHAS2014", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "BWAS2015", SpeciesName = "Blue Whiting")
 #Cruise <- loadCruise(CruiseName = "NWHAS2013", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "NWHAS2013", SpeciesName = "Boarfish")
 #Cruise <- loadCruise(CruiseName = "NWHAS2014", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "NWHAS2014", SpeciesName = "Boarfish")
 #Cruise <- loadCruise(CruiseName = "NWHAS2014", SpeciesName = "Sprat")
+Cruise <- fLoadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Sprat")
 #Cruise <- loadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "COM01_2011", SpeciesName = "Boarfish")   #boarfish 2011, excluding midnight-4am
 #Cruise <- loadCruise(CruiseName = "COM02_2011", SpeciesName = "Boarfish")   #boarfish 2011, 24hrs
-
-
 
 #print cruise summary to the screen
 summary(Cruise)
@@ -46,7 +50,6 @@ summary(Cruise)
 #see script DB2RData.r in this project
 #loads initial data for Hauls, Samples, LF, Ags, SA
 load(paste("./Data/",getName(Cruise),"/",getName(Cruise),".RData",sep=""))
-
 
 #load vessel track if it's available
 if (file.exists(paste("./RData/Track_", getName(Cruise), ".rda", sep = ""))) {
@@ -88,6 +91,12 @@ if (exists("SA")) {table(SA$Region_class)}
 Hauls <- fLoad_Hauls(getCode(Cruise))
 cat(length(Hauls), "hauls read in\n")
 
+#create output for upload to ICES Acoustic DB
+cat(fGenLogbook(Cruise,CTDs,Hauls,Transects))
+cat(fGenBiology(Cruise,Hauls))
+cat(fGenCatch(Cruise,Hauls))
+cat(fGenAcoustic(Cruise))
+
 #process SA data for the appropriate mark types
 SA <- fAggregate_SA(SA = {if (exists("SA")){SA}else{NULL}}, MarkTypes = MarkTypes)
 
@@ -125,7 +134,12 @@ dir.create(qcplots.dir,recursive=TRUE,showWarnings=FALSE);
 #and the location of the mark
 for (i in 1:length(SA)){
 
-  if (SA[[i]]@transect_code!=SA[[i]]@nearest_transect) {
+  #check transect_code assigned to SA exists in list of transects
+  if (!(SA[[i]]@transect_code %in% unlist(lapply(Transects,getCode)))) {
+    cat("SA with index",i,"has a transect code (",SA[[i]]@transect_code, ")that is not included in the list of transects\n")
+  }
+  
+  else if (SA[[i]]@transect_code!=SA[[i]]@nearest_transect) {
     
     #if transects are in the same strata, just plot the strata
     #with the transects and mark.
@@ -134,8 +148,6 @@ for (i in 1:length(SA)){
         getStratumCode(Transects[[which(lapply(Transects,getCode)==SA[[i]]@transect_code)]]),
         "but closer to",SA[[i]]@nearest_transect,"in stratum",
         getStratumCode(Transects[[which(lapply(Transects,getCode)==SA[[i]]@nearest_transect)]]),"\n")
-    
-    
     
     #on transect 
     on.transect<-which(lapply(Transects,getCode)==SA[[i]]@transect_code)
@@ -328,25 +340,38 @@ for (spe in seq(length=length(est.Species))){
     #mt.dir<-paste(spe.dir,mt_name,"/",sep="");
     #dir.create(mt.dir,recursive=TRUE,showWarnings=FALSE);
         
-     #SA data
-     mtSA <- SA[toupper(lapply(SA,getMarkType))==toupper(getNASCName(spe.MarkTypes[[mt]]))];
+    #SA data
+    mtSA <- SA[toupper(lapply(SA,getMarkType))==toupper(getNASCName(spe.MarkTypes[[mt]]))];
      
-     cat("Processing Mark Type: ",getName(spe.MarkTypes[[mt]])," (",getNASCName(spe.MarkTypes[[mt]]),") with ",length(mtSA)," marks\n",sep="");
+    cat("Processing Mark Type: ",getName(spe.MarkTypes[[mt]])," (",getNASCName(spe.MarkTypes[[mt]]),") with ",length(mtSA)," marks\n",sep="");
      
      #for each acoustic mark assign the appropriate haul, length frequency and acoustic 
      #cross section
      for (i in seq(length=length(mtSA))){
-       
+
        #assign the appropriate Haul to each mark
        mtSA[[i]]<-setHaulCode(mtSA[[i]],assignHaul(spe.MarkTypes[[mt]],pos=getPosition(mtSA[[i]])));
-       
-       #assign the LF to the mark
-       mtSA[[i]]<-setLF(mtSA[[i]],getLFProp(haul.code=getHaulCode(mtSA[[i]]),
-                                            species=getName(est.Species[[spe]]),
-                                            mix.species=getMixedSpecies(spe.MarkTypes[[mt]])))
+
+       #check that the assigned haul contains LF data for the species
+       #if not, this indicates that the haul assigned to the mark should not be included
+       #in the list of hauls for this mark type
+       if (is.null(getLFProp(haul.code=getHaulCode(mtSA[[i]]),
+                            species=getName(est.Species[[spe]]),
+                            mix.species=getMixedSpecies(spe.MarkTypes[[mt]])))) {
+         cat(paste("Index ",i," - Check list of hauls for mark type \"",
+                   getName(spe.MarkTypes[[mt]]),"\" as haul ",
+                   getHaulCode(mtSA[[i]])," contains no LF data for ",
+                   getName(est.Species[[spe]]),"\n", sep=""))
+       } else {
+         #assign the LF to the mark
+         mtSA[[i]]<-setLF(mtSA[[i]],getLFProp(haul.code=getHaulCode(mtSA[[i]]),
+                                              species=getName(est.Species[[spe]]),
+                                              mix.species=getMixedSpecies(spe.MarkTypes[[mt]])))
+       }
        
        #calculate the acoustic backscatter cross-section
-       mtSA[[i]]<-setCS(mtSA[[i]],Species,spe_name);
+       mtSA[[i]]<-setCS(mtSA[[i]],Species,spe_name)
+       
      }
     
     #loop over transects, select SA records and calculate transect mean

@@ -34,7 +34,7 @@ plots.dir<-paste(getwd(),"/Plots/",getName(Cruise),"/",getTargetCommon(Cruise),"
 #rep.Ages <- seq(range(unlist(lapply(Strata,getAgeRange)))[1],range(unlist(lapply(Strata,getAgeRange)))[2],by=1)
 #use the ALK
 #rep.Ages <- as.numeric(colnames(ALK))
-rep.Ages <- seq(0,max(as.numeric(colnames(ALK))))
+if (!is.null(ALK)) {rep.Ages <- seq(0,max(as.numeric(colnames(ALK))))} else {rep.Ages<-NULL}
 #marktypes to be reported
 rep.MTs <- names(lapply(spe.MarkTypes,getIncludeInEstimates))[unlist(lapply(spe.MarkTypes,getIncludeInEstimates))]
 
@@ -370,7 +370,9 @@ if (getEstByAge(Species[[Estspecies]])) {
   op <- lapply(LenAtAge, fFormat_OPLine, ages = rep.Ages, numfmt = "%.2f", subzero = "-")
 
   #biomass at length
-  BioAtLen <- combineLFs(lapply(Strata,getBioAtLen,marktypes=rep.MTs))
+  #BioAtLen <- combineLFs(lapply(Strata,getBioAtLen,marktypes=rep.MTs))
+  BioAtLen <- fCombine_LFs(lapply(Strata,getBioAtLen,marktypes=rep.MTs), offset=-.25)
+  
   
   #mean weight at length 
   MnWgtAtLen <- vector("numeric",length(op))
@@ -409,9 +411,12 @@ if (getEstByAge(Species[[Estspecies]])) {
   
   for (a in rep.Ages) {
     if (a%in%as.numeric(names(LenAtAge[[1]]))) {
-      if (sum(unlist(lapply(LenAtAge,"[[",a)))>0) {
-        MnWgtAtAge[as.character(a)] <- sum(unlist(lapply(LenAtAge,"[[",a))*MnWgtAtLen)/sum(unlist(lapply(LenAtAge,"[[",a)))
-        MnLenAtAge[as.character(a)] <- sum(unlist(lapply(LenAtAge,"[[",a))*as.numeric(names(LenAtAge)))/sum(unlist(lapply(LenAtAge,"[[",a)))
+      #if (sum(unlist(lapply(LenAtAge,"[[",a)))>0) {
+      if (sum(unlist(lapply(LenAtAge,"[[",as.character(a))))>0) {
+          #MnWgtAtAge[as.character(a)] <- sum(unlist(lapply(LenAtAge,"[[",a))*MnWgtAtLen)/sum(unlist(lapply(LenAtAge,"[[",a)))
+          MnWgtAtAge[as.character(a)] <- sum(unlist(lapply(LenAtAge,"[[",as.character(a)))*MnWgtAtLen)/sum(unlist(lapply(LenAtAge,"[[",as.character(a))))
+          #MnLenAtAge[as.character(a)] <- sum(unlist(lapply(LenAtAge,"[[",a))*as.numeric(names(LenAtAge)))/sum(unlist(lapply(LenAtAge,"[[",a)))
+          MnLenAtAge[as.character(a)] <- sum(unlist(lapply(LenAtAge,"[[",as.character(a)))*as.numeric(names(LenAtAge)))/sum(unlist(lapply(LenAtAge,"[[",as.character(a))))
       }
     }
   }
@@ -512,5 +517,5 @@ writeOPLine(lop,file=paste(tables.dir,"SpeciesByMarkType.csv",sep=""))
 plot(Cruise,
      filename = paste(plots.dir,"//",getName(Cruise),"_BioBySR.png",sep=""),
      strata = Strata,
-     srBoundaries = TRUE,
+     srboundaries = TRUE,
      printBio = TRUE)
