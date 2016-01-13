@@ -29,13 +29,19 @@ make.intermed <- function(import){
   
   import$cells$Layer_depth_min <- import$layers$Layer_depth_min[match(import$cells$Layer, import$layers$Layer)]
   import$cells$Layer_depth_max <- import$layers$Layer_depth_max[match(import$cells$Layer, import$layers$Layer)]
-  
+
+  #from cells  
   import$intermed <- import$cells[,c("Process_ID","Interval","Region_class","Layer_depth_min" , "Layer_depth_max", "PRC_NASC")]
+  #keep positive non-zero NASC vals
   import$intermed <- import$intermed[import$intermed$PRC_NASC >0,]
   
-  NASC_sum <- aggregate(PRC_NASC ~ Interval + Layer_depth_min +., sum, data = import$intermed)
-  import$intermed <- NASC_sum[,c("Process_ID","Interval","Region_class","Layer_depth_min" , "Layer_depth_max", "PRC_NASC")]
-  import$intermed <- import$intermed[order(import$intermed$Interval),] 
+  #if there's any data, aggregate it
+  if (nrow(import$intermed)>0){
+    NASC_sum <- aggregate(PRC_NASC ~ Interval + Layer_depth_min +., sum, data = import$intermed)
+    import$intermed <- NASC_sum[,c("Process_ID","Interval","Region_class","Layer_depth_min" , "Layer_depth_max", "PRC_NASC")]
+    #order by interval
+    import$intermed <- import$intermed[order(import$intermed$Interval),] 
+  }
   return(import)
   
 }
@@ -56,24 +62,29 @@ make.acoustic <- function(import){
       rep(Country, len), #Country
       rep(Vessel, len), #Vessel
       rep(Cruise, len), #Cruise
-      as.numeric(import$interval$VL_end)  ,             # Log (VL_End)
+      #as.numeric(import$interval$VL_end)  ,             # Log (VL_End)
+      as.numeric(import$interval$VL_start)  ,
       as.numeric(substr(import$interval$Date_E, 1,4)), #Year
       as.numeric(substr(import$interval$Date_E, 5,6)), #Month
       as.numeric(substr(import$interval$Date_E, 7,8)), #Day
-      as.numeric(substr(import$interval$Time_E, 2,3)) ,#HH
-      as.numeric(substr(import$interval$Time_E, 5,6)), #MM
-      as.numeric(import$interval$Lat_E), #Lat_E
-      as.numeric(import$interval$Lon_E), #Lon_E
+      #as.numeric(substr(import$interval$Time_E, 2,3)) ,#HH
+      #as.numeric(substr(import$interval$Time_E, 5,6)), #MM
+      as.numeric(substr(import$interval$Time_S, 2,3)) ,#HH
+      as.numeric(substr(import$interval$Time_S, 5,6)), #MM
+      #as.numeric(import$interval$Lat_E), #Lat_E
+      #as.numeric(import$interval$Lon_E), #Lon_E
+      as.numeric(import$interval$Lat_S), #Lat_S
+      as.numeric(import$interval$Lon_S), #Lon_S
       round(import$interval$VL_end - import$interval$VL_start), #Logint
       rep(Frequency, len), #Frequency
       rep(Minimum_integration_threshold, len)
       #, #Minimum_integration_threshold
-      #import$interval$Process_ID,
-      #import$interval$Interval
+      ,import$interval$Process_ID
+      ,import$interval$Interval
     ),stringsAsFactors =F)
   
     #if(dim(import$acoustic)[2] != 16) {return ("Error: incorrect number of columns, check EV output file")} else {
-    if(dim(import$acoustic)[2] != 14) {return ("Error: incorrect number of columns, check EV output file")} else {
+    if(dim(import$acoustic)[2] != 16) {return ("Error: incorrect number of columns, check EV output file")} else {
       
 #     colnames(import$acoustic) <- c("Country", "Vessel", "Cruise", "Log", "Year", 
 #                                    "Month", "Day", "HH", "MM", "Lat_E", "Lon_E", 
@@ -82,7 +93,7 @@ make.acoustic <- function(import){
     #Stox colnames
     colnames(import$acoustic) <- c("Country", "Vessel", "Cruise", "Log", "Year", 
                                    "Month", "Day", "Hour", "Min", "AcLat", "AcLon", 
-                                   "Logint", "Frequency", "Sv_threshold")
+                                   "Logint", "Frequency", "Sv_threshold","Intervals_ProcessID","Intervals_Interval")
 
     return(import)
   }
@@ -96,11 +107,11 @@ make.acousticValue <- function(import){
   import$Acousticvalues <- import$Acousticvalues[, c("Country", "Vessel", "Cruise",
                                                      "Log", "Year", "Month", "Day",
                                                      "Region_class", "Layer_depth_min",
-                                                     "Layer_depth_max", "PRC_NASC")]
+                                                     "Layer_depth_max", "PRC_NASC","Process_ID","Interval")]
   
-  if(dim(import$Acousticvalues)[2] != 11) {return ("Error: incorrect number of columns, check EV output file")} else {
+  if(dim(import$Acousticvalues)[2] != 13) {return ("Error: incorrect number of columns, check EV output file")} else {
     #colnames(import$Acousticvalues) <- c("Country", "Vessel", "Cruise", "Log", "Year", "Month", "Day", "Species", "ChUppdepth", "ChLowdepth", "SA")
-    colnames(import$Acousticvalues) <- c("Country", "Vessel", "Cruise", "Log", "Year", "Month", "Day", "SACat", "ChUppdepth", "ChLowdepth", "SA")
+    colnames(import$Acousticvalues) <- c("Country", "Vessel", "Cruise", "Log", "Year", "Month", "Day", "SACat", "ChUppdepth", "ChLowdepth", "SA","Aco_Process_ID","Aco_Interval")
     return(import)
   }
 }
@@ -121,7 +132,7 @@ fGenAcoustic <- function(Cruise){
   #get the input filelist (only csv files in the named folder)
   files <- list.files(path=ipdir)
   files <- files[grep(".csv", files)]
-  transects <- unique(as.numeric(gsub("\\D", "", files)))
+  transects <- sort(unique(as.numeric(gsub("\\D", "", files))))
 
   if(length(files)/length(transects)!= 4) print("Error: should be 4 csv files for each and every transect")
   
@@ -144,7 +155,9 @@ fGenAcoustic <- function(Cruise){
   #test <- do.all(transects[1])
   
   all.transects <- lapply(transects, do.all)
+  #all.transects <- lapply(c(702,801), do.all)
   names(all.transects) <- transects
+  #names(all.transects) <- c(702,801)
   
   acoustic.table       <- do.call( rbind, lapply(all.transects, function(x) x$acoustic))
   acousticvalue.table  <- do.call( rbind, lapply(all.transects, function(x) x$Acousticvalues))
@@ -193,15 +206,16 @@ fGenAcoustic <- function(Cruise){
   #Removing Log values from acoustic.table that are not included in the acousticvalues.table
   #dim(acoustic.table)
   #dim(acousticvalue.table)
-  acoustic.table <- acoustic.table[acoustic.table$Log %in% unique(acousticvalue.table$Log),]
+  #acoustic.table <- acoustic.table[acoustic.table$Log %in% unique(acousticvalue.table$Log),]
+  acoustic.table <- acoustic.table[paste0(acoustic.table$Intervals_ProcessID,acoustic.table$Log) %in% unique(paste0(acousticvalue.table$Aco_Process_ID,acousticvalue.table$Log)),]
   #dim(acoustic.table)
   #unique(acousticvalue.table$Log)
   #match(acoustic.table$Log, acousticvalue.table$Log)
   #match(acousticvalue.table$Log, acoustic.table$Log)
   
   #write to two csv files
-  write.csv(acoustic.table,        file = fAcoustic,        quote = F, row.names = F)
-  write.csv(acousticvalue.table[,c(1,2,3,4,5,6,7,8,9,10,12,11,13)], file = fAcousticValues, quote = F, row.names = F)
+  write.csv(acoustic.table[,c(1:14)],        file = fAcoustic,        quote = F, row.names = F)
+  write.csv(acousticvalue.table[,c(1,2,3,4,5,6,7,8,9,10,14,11,15)], file = fAcousticValues, quote = F, row.names = F)
   
   return(paste0(nrow(acoustic.table)," lines written to ",fAcoustic,"\n",nrow(acousticvalue.table)," lines written to ",fAcousticValues,"\n"))
      
