@@ -27,8 +27,8 @@ source("./Scripts/Init.r")
 #load Cruise data file
 
 #Cruise <- loadCruise(CruiseName = "CSHAS2015", SpeciesName = "Sprat")
-#Cruise <- loadCruise(CruiseName = "CSHAS2015_Adaptive", SpeciesName = "Herring")
-#Cruise <- loadCruise(CruiseName = "CSHAS2015", SpeciesName = "Herring")
+Cruise <- fLoadCruise(CruiseName = "CSHAS2015_Adaptive", SpeciesName = "Herring")
+#Cruise <- fLoadCruise(CruiseName = "CSHAS2015", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "CSHAS2014", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "BWAS2015", SpeciesName = "Blue Whiting")
 #Cruise <- loadCruise(CruiseName = "NWHAS2013", SpeciesName = "Herring")
@@ -36,7 +36,7 @@ source("./Scripts/Init.r")
 #Cruise <- loadCruise(CruiseName = "NWHAS2014", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "NWHAS2014", SpeciesName = "Boarfish")
 #Cruise <- loadCruise(CruiseName = "NWHAS2014", SpeciesName = "Sprat")
-Cruise <- fLoadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
+#Cruise <- fLoadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "CSHAS2013", SpeciesName = "Sprat")
 #Cruise <- loadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
@@ -92,13 +92,13 @@ Hauls <- fLoad_Hauls(getCode(Cruise))
 cat(length(Hauls), "hauls read in\n")
 
 #create output for upload to ICES Acoustic DB
-cat(fGenLogbook(Cruise,CTDs,Hauls,Transects))
-cat(fGenBiology(Cruise,Hauls))
-cat(fGenCatch(Cruise,Hauls))
-cat(fGenAcoustic(Cruise))
+#cat(fGenLogbook(Cruise,CTDs,Hauls,Transects))
+#cat(fGenBiology(Cruise,Hauls))
+#cat(fGenCatch(Cruise,Hauls))
+#cat(fGenAcoustic(Cruise))
 
-#process SA data for the appropriate mark types
-SA <- fAggregate_SA(SA = {if (exists("SA")){SA}else{NULL}}, MarkTypes = MarkTypes)
+#process SA data for the appropriate mark types (100m EDSU)
+SA <- fAggregate_SA(SA = {if (exists("SA")){SA}else{NULL}}, MarkTypes = MarkTypes, EDSU=100/1852)
 
 #check this matches with mark types listed above. Missing mark types may indicate that the NASC_name of 
 #the MarkTypes needs updating.
@@ -115,13 +115,35 @@ dir.create(plots.dir, recursive=TRUE, showWarnings=FALSE);
 #generate some survey level plots
 source("./Scripts/Plots.r")
 
+
+#one off plots for adaptive survey
+mt <- lapply(MarkTypes,getNASCName)
+
+plot(Strata[[1]],
+     filename = paste(plots.dir,"//Strata_",as.character(getCode(Strata[[1]])),".png",sep=""),
+     transects = Transects,
+     sa = (if (exists("SA")) {SA[which(lapply(SA,getMarkType)%in%unlist(mt))]} else {NULL}),
+     Track = (if (exists("Track")) {Track} else {NULL}),
+     xlim=c(-7.25,-7.15),
+     ylim=c(51.11,51.18))
+
+plot(Strata[[2]],
+     filename = paste(plots.dir,"//Strata_",as.character(getCode(Strata[[2]])),".png",sep=""),
+     transects = Transects,
+     sa = (if (exists("SA")) {SA[which(lapply(SA,getMarkType)%in%unlist(mt))]} else {NULL}),
+     Track = (if (exists("Track")) {Track} else {NULL}),
+     xlim=c(-6.65,-6.45),
+     ylim=c(51.22,51.33))
+
+
+
 #Only proceed past here when strata plots have been examined
 #to check transects and strata bounds
 
 #assign a transect to each registration on the basis of its proximity
 #will be checked against transect assigned previously when data was
 #uploaded to the DB
-SA<-lapply(SA,assignTransect,tran=Transects)
+SA <- lapply(SA,assignTransect,tran=Transects)
 
 #create QC plots directory
 qcplots.dir<-paste(getwd(),"/QCPlots/",getName(Cruise),"/",getTargetCommon(Cruise),"/",sep="");

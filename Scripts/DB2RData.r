@@ -13,8 +13,9 @@ source("./Scripts/Init.r")
 
 #load Cruise data file
 #Cruise <- loadCruise(CruiseName = "CSHAS2015", SpeciesName = "Herring")
+Cruise <- fLoadCruise(CruiseName = "CSHAS2015_Adaptive", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "CSHAS2014", SpeciesName = "Herring")
-Cruise <- fLoadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
+#Cruise <- fLoadCruise(CruiseName = "NWHAS2015", SpeciesName = "Herring")
 #Cruise <- loadCruise(CruiseName = "COM01_2011", SpeciesName = "Boarfish")   #2011 boarfish daylight hours
 #Cruise <- loadCruise(CruiseName = "COM02_2011", SpeciesName = "Boarfish")   #2011 boarfish 24hrs
 
@@ -45,7 +46,7 @@ sql <- paste("SELECT h.HaulNo as HaulNo,h.Validity as Valid,h.ICES_Rectangle as 
              "h.HaulLongitude as HaulLon,h.Shot_Depth as ShotDepth,h.Haul_Depth as HaulDepth,e.Date as ShootDate,",
              "e.Time as ShootTime,e.EndDate as HaulDate,e.EndTime as HaulTime FROM FSS_HAULS h INNER JOIN FSS_EVENTS e ",
              "ON h.haulno = cint(e.eventno) WHERE h.SurveyName = '",
-             CruiseCode,"'"," AND e.eventtype = 'Haul' ORDER BY HaulNo",sep="")
+             CruiseName,"'"," AND e.eventtype = 'Haul' ORDER BY HaulNo",sep="")
 
 Hauls <- sqlQuery(channel,sql);
 
@@ -94,9 +95,13 @@ if (nrow(Hauls)>0) {
 }
 
 #haul samples
+#sql <- paste("SELECT HaulNo, [Species name], [Sample Weight], [Sub-Sample Weight], ",
+#             "[Total Weight] FROM FSS_SAMPLES WHERE SurveyName = '",
+#             CruiseCode,"'" ," ORDER BY HaulNo",sep="")
+
 sql <- paste("SELECT HaulNo, [Species name], [Sample Weight], [Sub-Sample Weight], ",
              "[Total Weight] FROM FSS_SAMPLES WHERE SurveyName = '",
-             CruiseCode,"'" ," ORDER BY HaulNo",sep="")
+             CruiseName,"'" ," ORDER BY HaulNo",sep="")
 
 Samples <- sqlQuery(channel,sql)
 
@@ -114,9 +119,13 @@ if (nrow(Samples)>0) {
 
     
 #Length-Freq info
+#sql <- paste("SELECT HaulNo,[Species name],[Length class],[Sub-sample frequency] ",
+#             "FROM FSS_LENGTHFREQ WHERE [Sub-sample frequency]>0 AND SurveyName = '",
+#             CruiseCode,"'"," ORDER BY HaulNo,[Species name],[Length class]",sep="")
+
 sql <- paste("SELECT HaulNo,[Species name],[Length class],[Sub-sample frequency] ",
              "FROM FSS_LENGTHFREQ WHERE [Sub-sample frequency]>0 AND SurveyName = '",
-             CruiseCode,"'"," ORDER BY HaulNo,[Species name],[Length class]",sep="")
+             CruiseName,"'"," ORDER BY HaulNo,[Species name],[Length class]",sep="")
 
 LF <- sqlQuery(channel,sql)
 
@@ -133,10 +142,15 @@ if (nrow(LF)) {
 
     
 #Aged data
+#sql <- paste("SELECT HaulNo,[Species name],[Index],[Length class],",
+#             "[Sex],[Gonad maturity],[Total body weight],[Primary age estimate] FROM ",
+#             "FSS_AGEDFISH WHERE SurveyName = '",
+#            CruiseCode,"'"," ORDER BY HaulNo,[Species name],[Index]",sep="")
+
 sql <- paste("SELECT HaulNo,[Species name],[Index],[Length class],",
              "[Sex],[Gonad maturity],[Total body weight],[Primary age estimate] FROM ",
              "FSS_AGEDFISH WHERE SurveyName = '",
-             CruiseCode,"'"," ORDER BY HaulNo,[Species name],[Index]",sep="")
+             CruiseName,"'"," ORDER BY HaulNo,[Species name],[Index]",sep="")
 
 Ages <- sqlQuery(channel,sql)
 

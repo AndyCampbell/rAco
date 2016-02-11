@@ -1957,7 +1957,7 @@ fCombine_LFs <- function(lIn, offset=NULL){
   
 }
 
-fAggregate_SA <- function(SA, MarkTypes) {
+fAggregate_SA <- function(SA, MarkTypes, EDSU=1) {
   
   #SA - the raw SA data
   if (is.null(SA)) return(c())
@@ -2024,7 +2024,7 @@ fAggregate_SA <- function(SA, MarkTypes) {
                        stratum_code = as.character(dfSA.agg$Strata[i]),
                        transect_code = as.character(dfSA.agg$Transect[i]),
                        school_length = dfSA.agg$School.Length[i],
-                       cell_length = 1,
+                       cell_length = EDSU,
                        NASC = dfSA.agg$SA[i],
                        position = waypoint(lat = dfSA.agg$Lat[i],
                                            lon = dfSA.agg$Lon[i],

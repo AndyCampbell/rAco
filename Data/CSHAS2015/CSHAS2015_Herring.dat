@@ -1,8 +1,10 @@
 Acoustic Survey Cruise Details
+Country Code::IE
 Cruise Code::CE15014
 Cruise Name::CSHAS2015
 Desc::Celtic Sea Herring Acoustic Survey, 2015
 Vessel::Celtic Explorer
+CallSign::EIGB
 Start Date::2015-10-02 00:00:01
 End Date::2015-10-22 23:59:59
 Target Species Common::Herring
